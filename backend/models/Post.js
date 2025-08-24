@@ -551,6 +551,59 @@ class Post {
             throw error;
         }
     }
+
+    // Create new post with media
+static async createWithMedia({ userId, content, mediaIds = [], isAnonymous = false, visibility = 'public' }) {
+  try {
+    // Start transaction
+    await db.query('BEGIN');
+    
+    // Create the post first
+    const post = await this.create({ userId, content, isAnonymous, postType: 'media', visibility });
+    
+    // Associate media with post
+    if (mediaIds.length > 0) {
+      for (let i = 0; i < mediaIds.length; i++) {
+        await db.query(
+          `INSERT INTO post_media (post_id, media_id, position) VALUES ($1, $2, $3)`,
+          [post.id, mediaIds[i], i]
+        );
+      }
+    }
+    
+    // Commit transaction
+    await db.query('COMMIT');
+    
+    // Return post with media
+    return await this.findById(post.id, userId);
+  } catch (error) {
+    // Rollback on error
+    await db.query('ROLLBACK');
+    throw error;
+  }
+}
+
+// Get media for a post
+static async getMedia(postId) {
+  try {
+    const query = `
+      SELECT m.* FROM media m
+      JOIN post_media pm ON m.id = pm.media_id
+      WHERE pm.post_id = $1 AND m.is_deleted = false
+      ORDER BY pm.position ASC
+    `;
+    
+    const result = await db.query(query, [postId]);
+    
+    return result.rows.map(media => ({
+      ...media,
+      variants: typeof media.variants === 'string' ? JSON.parse(media.variants) : media.variants,
+      metadata: typeof media.metadata === 'string' ? JSON.parse(media.metadata) : media.metadata
+    }));
+  } catch (error) {
+    throw error;
+  }
+}
 }
 
 module.exports = Post;

@@ -14,6 +14,8 @@ const groupRoutes = require('./routes/groupRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const socketManager = require('./utils/socketManager');
 const notificationRoutes = require('./routes/notificationRoutes');
+const mediaRoutes = require('./routes/mediaRoutes');
+
 
 
 const app = express();
@@ -35,6 +37,7 @@ app.use('/api/friends', friendshipRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/conversations', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Test routes
 app.get('/api/test', (req, res) => {
