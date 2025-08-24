@@ -25,7 +25,26 @@ const { setupSwagger } = require('./config/swagger');
 const { router: metricsRouter, metricsMiddleware, errorMetricsMiddleware } = require('./routes/metricsRoutes');
 const { requestLogger } = require('./middleware/logging');
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { selectiveCsrf, handleCsrfError } = require('./middleware/csrf');
+const { loginRateLimiter, passwordResetRateLimiter, registrationRateLimiter } = require('./middleware/enhancedRateLimiter');
+const { initQueryMonitoring } = require('./services/queryMonitoringService');
+const circuitBreakerService = require('./services/circuitBreakerService');
 
+const initializeServices = async () => {
+  try {
+    // Initialize query monitoring
+    await initQueryMonitoring();
+    
+    // Initialize other services as needed
+    console.log('All services initialized successfully');
+  } catch (error) {
+    console.error('Error initializing services:', error);
+    // Continue anyway to avoid startup failure
+  }
+};
+
+
+initializeServices().catch(console.error);
 
 
 
@@ -40,6 +59,8 @@ app.use(cors());
 app.use(express.json());
 app.use(requestLogger);
 app.use(metricsMiddleware);
+app.use(selectiveCsrf);
+app.use(handleCsrfError);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -130,6 +151,64 @@ app.get('/api/test-db', async (req, res) => {
         });
     }
 });
+
+app.post('/api/auth/login', loginRateLimiter);
+app.post('/api/auth/register', registrationRateLimiter);
+app.post('/api/auth/forgot-password', passwordResetRateLimiter);
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || 'unknown'
+  });
+});
+
+
+
+app.get('/api/admin/circuit-breakers', authenticateToken, isAdmin, (req, res) => {
+  const statuses = Object.keys(circuitBreakerService.getBreakerStatus('all'));
+  res.json(statuses);
+});
+
+
+app.get('/api/admin/slow-queries', authenticateToken, isAdmin, async (req, res) => {
+  const { getSlowQueryReport } = require('./services/queryMonitoringService');
+  const threshold = parseInt(req.query.threshold) || 200;
+  const limit = parseInt(req.query.limit) || 100;
+  
+  const report = await getSlowQueryReport(threshold, limit);
+  res.json(report);
+});
+
+// Enhanced global error handler (replace existing error handler or add if none exists)
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  
+  // Log the error
+  console.error(`[${new Date().toISOString()}] Error:`, {
+    path: req.path,
+    method: req.method,
+    statusCode,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    userId: req.user?.id,
+    ip: req.ip
+  });
+  
+  // Send appropriate response
+  res.status(statusCode).json({
+    error: {
+      message: statusCode === 500 && process.env.NODE_ENV === 'production' 
+        ? 'Internal Server Error' 
+        : err.message,
+      code: err.code || 'SERVER_ERROR'
+    }
+  });
+});
+
+
 
 app.listen(PORT, () => {
     console.log(`🚀 Gossip Server running at http://localhost:${PORT}`);
