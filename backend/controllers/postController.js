@@ -2,6 +2,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
+const GamificationService = require('../services/gamificationService');
 
 // Create new post
 const createPost = async (req, res) => {
@@ -31,6 +32,14 @@ const createPost = async (req, res) => {
             postType,
             visibility
         });
+
+        // Award points for creating a post
+        await GamificationService.awardPoints(
+            req.user.id,
+            'post_create',
+            post.id,
+            { postType }
+        );
 
         res.status(201).json({
             message: 'Post created successfully',
@@ -73,6 +82,14 @@ const createGroupPost = async (req, res) => {
             isAnonymous,
             postType
         });
+
+        // Award points for creating a group post
+        await GamificationService.awardPoints(
+            userId,
+            'post_create',
+            post.id,
+            { postType, groupId }
+        );
 
         res.status(201).json({
             message: 'Group post created successfully',
@@ -277,6 +294,107 @@ const deletePost = async (req, res) => {
     }
 };
 
+// Like a post
+const likePost = async (req, res) => {
+    try {
+        const { id: postId } = req.params;
+        const userId = req.user.id;
+
+        // Check if post exists and user has permission to view it
+        const post = await Post.getWithVisibilityCheck(postId, userId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found or you don\'t have permission to view it' });
+        }
+
+        // Add like
+        const result = await Post.addLike(postId, userId);
+
+        if (!result.success) {
+            return res.status(400).json({ message: result.message });
+        }
+
+        // Award points to post owner for receiving a like (if not self-like)
+        if (post.user_id !== userId) {
+            await GamificationService.awardPoints(
+                post.user_id,
+                'post_like_received',
+                postId,
+                { likedBy: userId }
+            );
+        }
+
+        res.json({ 
+            message: result.message,
+            likeCount: result.likeCount
+        });
+
+    } catch (error) {
+        console.error('Like post error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+// Unlike a post
+const unlikePost = async (req, res) => {
+    try {
+        const { id: postId } = req.params;
+        const userId = req.user.id;
+
+        // Check if post exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Remove like
+        const result = await Post.removeLike(postId, userId);
+
+        if (!result.success) {
+            return res.status(400).json({ message: result.message });
+        }
+
+        res.json({ 
+            message: result.message,
+            likeCount: result.likeCount
+        });
+
+    } catch (error) {
+        console.error('Unlike post error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+// Get likes for a post
+const getPostLikes = async (req, res) => {
+    try {
+        const { id: postId } = req.params;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = parseInt(req.query.offset) || 0;
+
+        // Check if post exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Get likes
+        const likes = await Post.getLikes(postId, limit, offset);
+
+        res.json({
+            likes: likes.users,
+            count: likes.count,
+            pagination: {
+                limit,
+                offset
+            }
+        });
+
+    } catch (error) {
+        console.error('Get post likes error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 module.exports = {
     createPost,
     createGroupPost,
@@ -285,5 +403,8 @@ module.exports = {
     getPostById,
     getUserPosts,
     updatePost,
-    deletePost
+    deletePost,
+    likePost,
+    unlikePost,
+    getPostLikes
 };

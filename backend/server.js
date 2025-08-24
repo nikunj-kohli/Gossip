@@ -20,6 +20,8 @@ const { trackPostView } = require('./middleware/postViewTracker');
 const reportRoutes = require('./routes/reportRoutes');
 const moderationRoutes = require('./routes/moderationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const gamificationRoutes = require('./routes/gamificationRoutes');
+
 
 
 
@@ -48,7 +50,46 @@ app.use('/api/posts/:postId', trackPostView);
 app.use('/api/reports', reportRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
+
+app.use(async (req, res, next) => {
+  // If user is authenticated, track actions that deserve points
+  if (req.user) {
+    const originalSend = res.send;
+    
+    res.send = function(body) {
+      // Only process for successful responses
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        try {
+          const url = req.originalUrl;
+          const method = req.method;
+          
+          // Check for specific actions that deserve points
+          if (method === 'POST' && url.match(/\/api\/posts\/?$/)) {
+            // User created a post
+            const GamificationService = require('./services/gamificationService');
+            GamificationService.awardPoints(req.user.id, 'post_create', JSON.parse(body).id)
+              .catch(err => console.error('Error awarding points for post creation:', err));
+          }
+          else if (method === 'POST' && url.match(/\/api\/comments\/?$/)) {
+            // User created a comment
+            const GamificationService = require('./services/gamificationService');
+            GamificationService.awardPoints(req.user.id, 'comment_create', JSON.parse(body).id)
+              .catch(err => console.error('Error awarding points for comment creation:', err));
+          }
+          // Add other actions here
+        } catch (error) {
+          console.error('Error in gamification middleware:', error);
+        }
+      }
+      
+      originalSend.apply(res, arguments);
+    };
+  }
+  
+  next();
+});
 
 
 // Test routes
