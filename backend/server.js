@@ -19,6 +19,7 @@ const searchRoutes = require('./routes/searchRoutes');
 const { trackPostView } = require('./middleware/postViewTracker');
 const reportRoutes = require('./routes/reportRoutes');
 const moderationRoutes = require('./routes/moderationRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 
 
@@ -46,6 +47,8 @@ app.use('/api/search', searchRoutes);
 app.use('/api/posts/:postId', trackPostView);
 app.use('/api/reports', reportRoutes);
 app.use('/api/moderation', moderationRoutes);
+app.use('/api/chat', chatRoutes);
+
 
 
 // Test routes
