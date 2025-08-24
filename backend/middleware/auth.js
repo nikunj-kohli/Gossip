@@ -25,20 +25,25 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // Optional auth - doesn't fail if no token
-const optionalAuth = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-        try {
-            const decoded = verifyToken(token);
-            const user = await User.findById(decoded.userId);
-            req.user = user;
-        } catch (error) {
-            // Continue without user
-        }
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    // Continue without user authentication
+    return next();
+  }
+  
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      // Invalid token, but continue without authentication
+      return next();
     }
+    
+    // Set authenticated user
+    req.user = user;
     next();
+  });
 };
 
 module.exports = {

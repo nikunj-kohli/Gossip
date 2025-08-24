@@ -15,6 +15,10 @@ const messageRoutes = require('./routes/messageRoutes');
 const socketManager = require('./utils/socketManager');
 const notificationRoutes = require('./routes/notificationRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
+const searchRoutes = require('./routes/searchRoutes');
+const { trackPostView } = require('./middleware/postViewTracker');
+
+
 
 
 
@@ -38,6 +42,9 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/conversations', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/posts/:postId', trackPostView);
+
 
 // Test routes
 app.get('/api/test', (req, res) => {
