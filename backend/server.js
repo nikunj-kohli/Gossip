@@ -21,6 +21,10 @@ const reportRoutes = require('./routes/reportRoutes');
 const moderationRoutes = require('./routes/moderationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const gamificationRoutes = require('./routes/gamificationRoutes');
+const { setupSwagger } = require('./config/swagger');
+const { router: metricsRouter, metricsMiddleware, errorMetricsMiddleware } = require('./routes/metricsRoutes');
+const { requestLogger } = require('./middleware/logging');
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 
 
@@ -34,6 +38,8 @@ global.io = io;
 
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger);
+app.use(metricsMiddleware);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -51,6 +57,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/gamification', gamificationRoutes);
+app.use('/api/', apiLimiter);
+app.use('/api/auth', authLimiter);
 
 
 app.use(async (req, res, next) => {
@@ -91,6 +99,17 @@ app.use(async (req, res, next) => {
   next();
 });
 
+setupSwagger(app);
+
+app.use('/api', metricsRouter);
+app.use(errorMetricsMiddleware);
+
+const postRoutes = require('./routes/postRoutes');
+const commentRoutes = require('./routes/commentRoutes');
+const { postLimiter, commentLimiter, likeLimiter } = require('./middleware/rateLimiter');
+
+app.use('/api/posts', postLimiter, postRoutes);
+app.use('/api/comments', commentLimiter, commentRoutes);
 
 // Test routes
 app.get('/api/test', (req, res) => {
