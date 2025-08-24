@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const db = require('./config/database');
 require('dotenv').config();
@@ -11,10 +12,16 @@ const commentRoutes = require('./routes/commentRoutes');
 const friendshipRoutes = require('./routes/friendshipRoutes');
 const groupRoutes = require('./routes/groupRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const socketManager = require('./utils/socketManager');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+const io = socketManager.initialize(server);
+global.io = io;
 
 app.use(cors());
 app.use(express.json());
@@ -27,6 +34,7 @@ app.use('/api', commentRoutes); // Note: this will use paths like /api/posts/:id
 app.use('/api/friends', friendshipRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/conversations', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Test routes
 app.get('/api/test', (req, res) => {
