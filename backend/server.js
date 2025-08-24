@@ -10,6 +10,8 @@ const likeRoutes = require('./routes/likeRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const friendshipRoutes = require('./routes/friendshipRoutes');
 const groupRoutes = require('./routes/groupRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +26,7 @@ app.use('/api', likeRoutes); // Note: this will use paths like /api/posts/:id/li
 app.use('/api', commentRoutes); // Note: this will use paths like /api/posts/:id/comments
 app.use('/api/friends', friendshipRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/conversations', messageRoutes);
 
 // Test routes
 app.get('/api/test', (req, res) => {
