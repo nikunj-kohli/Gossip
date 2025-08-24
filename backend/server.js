@@ -17,8 +17,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const { trackPostView } = require('./middleware/postViewTracker');
-
-
+const reportRoutes = require('./routes/reportRoutes');
+const moderationRoutes = require('./routes/moderationRoutes');
 
 
 
@@ -44,6 +44,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/posts/:postId', trackPostView);
+app.use('/api/reports', reportRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 
 // Test routes
