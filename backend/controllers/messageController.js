@@ -6,31 +6,72 @@ const User = require('../models/User');
 exports.startConversation = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { isAnonymous } = req.body;
         const currentUserId = req.user.id;
+        const isAnonymous = req.body && req.body.isAnonymous ? req.body.isAnonymous : false;
         
-        // Check if target user exists
-        const targetUser = await User.findById(userId);
+        console.log('=== CONVERSATION DEBUG ===');
+        console.log('req.params:', req.params);
+        console.log('req.user:', req.user);
+        console.log('userId param:', userId);
+        console.log('currentUserId:', currentUserId);
+        console.log('req.body:', req.body);
+        console.log('isAnonymous:', isAnonymous);
+        console.log('userId type:', typeof userId);
+        console.log('currentUserId type:', typeof currentUserId);
+        console.log('Comparing userIds:', userId, '===', currentUserId, '=', userId == currentUserId);
+        
+        let targetUser;
+        
+        // Check if parameter is username or userId
+        if (isNaN(userId)) {
+            // It's a username, find by username
+            console.log('Finding user by username:', userId);
+            targetUser = await User.findByUsername(userId);
+        } else {
+            // It's a userId, find by id
+            console.log('Finding user by ID:', userId);
+            targetUser = await User.findById(userId);
+        }
+        
+        console.log('Target user found:', targetUser);
+        
         if (!targetUser) {
+            console.log('User not found');
             return res.status(404).json({ message: 'User not found' });
         }
         
         // Prevent starting conversation with self
-        if (currentUserId === userId) {
+        if (currentUserId == targetUser.id) {
+            console.log('Cannot start conversation with self');
             return res.status(400).json({ message: 'Cannot start conversation with yourself' });
         }
+        
+        console.log('Finding/creating conversation between:', currentUserId, 'and', targetUser.id);
         
         // Find or create conversation
         const conversation = await Conversation.findOrCreateOneToOne(
             currentUserId, 
-            userId,
+            targetUser.id,
             isAnonymous || false
         );
         
+        console.log('Conversation result:', conversation);
+        
         return res.status(200).json(conversation);
     } catch (error) {
+        console.error('=== CONVERSATION ERROR ===');
         console.error('Error starting conversation:', error);
-        return res.status(500).json({ message: 'Server error' });
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', error);
+        
+        // Return detailed error for debugging
+        return res.status(500).json({ 
+            message: 'Server error',
+            details: error.message,
+            stack: error.stack,
+            type: error.constructor.name
+        });
     }
 };
 
@@ -98,7 +139,7 @@ exports.leaveConversation = async (req, res) => {
 exports.sendMessage = async (req, res) => {
     try {
         const { conversationId } = req.params;
-        const { content, isAnonymous } = req.body;
+        const { content, message_type, messageType, isAnonymous } = req.body;
         const currentUserId = req.user.id;
         
         // Validate content
@@ -118,8 +159,32 @@ exports.sendMessage = async (req, res) => {
             senderId: currentUserId,
             conversationId,
             content,
+            messageType: message_type || messageType || 'text',
             isAnonymous: isAnonymous || false
         });
+        
+        // Emit real-time message to conversation participants
+        const io = global.io;
+        if (io) {
+            // Get conversation details to find other participant
+            const conversation = await Conversation.findById(conversationId, currentUserId);
+            const otherUserId = conversation.user1_id === currentUserId ? conversation.user2_id : conversation.user1_id;
+            
+            // Emit to conversation room
+            io.to(`conversation:${conversationId}`).emit('message:received', {
+                ...message,
+                conversationId: parseInt(conversationId),
+                senderId: currentUserId
+            });
+            
+            // Emit conversation update to update conversation list
+            io.emit('conversation:update', {
+                conversationId: parseInt(conversationId),
+                last_message: content,
+                last_message_at: message.created_at,
+                unread_count: 1 // Increment for other user
+            });
+        }
         
         return res.status(201).json(message);
     } catch (error) {

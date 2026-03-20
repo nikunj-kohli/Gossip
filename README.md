@@ -228,9 +228,6 @@ npm test
 
 We welcome contributions to Gossip! Please see our Contributing Guidelines for details on how to submit pull requests, report issues, and suggest features.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 

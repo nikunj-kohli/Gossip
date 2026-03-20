@@ -8,8 +8,7 @@ const {
     updatePost,
     deletePost,
     createGroupPost,
-    getGroupPosts,
-    togglePinPost
+    getGroupPosts
 } = require('../controllers/postController');
 
 const router = express.Router();
@@ -30,6 +29,5 @@ router.get('/me/posts', authenticateToken, getUserPosts);
 
 // Protected group post routes
 router.post('/groups/:groupId/posts', authenticateToken, createGroupPost);
-router.post('/groups/:groupId/posts/:postId/pin', authenticateToken, togglePinPost);
 
 module.exports = router;

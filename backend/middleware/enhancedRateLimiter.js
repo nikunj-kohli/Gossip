@@ -3,68 +3,91 @@ const config = require('../config/config');
 const { RateLimiterRedis } = require('rate-limiter-flexible');
 const { logger } = require('../services/loggingService');
 
-// Connect to Redis with error handling
-const redisClient = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password,
-  enableOfflineQueue: false,
-  retryStrategy: (times) => {
-    const delay = Math.min(times * 500, 30000);
-    return delay;
-  }
-});
+// Only initialize Redis if rate limiting is enabled
+const isRateLimitingEnabled = process.env.ENABLE_RATE_LIMITING === 'true';
 
-// Fallback to memory if Redis is unavailable
-let isRedisAvailable = true;
+let redisClient = null;
+let isRedisAvailable = false;
 const memoryRateLimiters = new Map();
 
-redisClient.on('error', (err) => {
-  if (isRedisAvailable) {
-    logger.error('Redis rate limiter error, falling back to memory:', err);
-    isRedisAvailable = false;
-  }
-});
+if (isRateLimitingEnabled) {
+  // Connect to Redis with error handling
+  redisClient = new Redis({
+    host: config.redis.host,
+    port: config.redis.port,
+    password: config.redis.password,
+    enableOfflineQueue: false,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 500, 30000);
+      return delay;
+    }
+  });
 
-redisClient.on('connect', () => {
-  if (!isRedisAvailable) {
-    logger.info('Redis rate limiter reconnected');
-    isRedisAvailable = true;
-  }
-});
+  isRedisAvailable = true;
+
+  redisClient.on('error', (err) => {
+    if (isRedisAvailable) {
+      logger.error('Redis rate limiter error, falling back to memory:', err);
+      isRedisAvailable = false;
+    }
+  });
+
+  redisClient.on('connect', () => {
+    if (!isRedisAvailable) {
+      logger.info('Redis rate limiter reconnected');
+      isRedisAvailable = true;
+    }
+  });
+} else {
+  logger.info('Rate limiting is disabled, using memory-based limiters');
+}
 
 // Configure rate limiters
 const rateLimiters = {
   // Login attempts - more strict
-  login: new RateLimiterRedis({
-    storeClient: redisClient,
-    keyPrefix: 'ratelimit:login',
+  login: {
     points: 5, // 5 attempts
     duration: 60 * 15, // per 15 minutes
     blockDuration: 60 * 30, // Block for 30 minutes if exceeded
-  }),
+  },
   
   // Password reset attempts
-  passwordReset: new RateLimiterRedis({
-    storeClient: redisClient,
-    keyPrefix: 'ratelimit:passwordreset',
+  passwordReset: {
     points: 3, // 3 attempts
     duration: 60 * 60, // per hour
     blockDuration: 60 * 60, // Block for 1 hour if exceeded
-  }),
+  },
   
   // Registration attempts
-  registration: new RateLimiterRedis({
-    storeClient: redisClient,
-    keyPrefix: 'ratelimit:registration',
+  registration: {
     points: 3, // 3 registrations
     duration: 60 * 60 * 24, // per day
     blockDuration: 60 * 60 * 12, // Block for 12 hours if exceeded
-  })
+  }
 };
+
+// Initialize Redis rate limiters if Redis is available
+if (isRateLimitingEnabled && redisClient) {
+  Object.keys(rateLimiters).forEach(type => {
+    rateLimiters[type] = new RateLimiterRedis({
+      storeClient: redisClient,
+      keyPrefix: `ratelimit:${type}`,
+      ...rateLimiters[type]
+    });
+  });
+}
 
 // Get appropriate rate limiter
 const getRateLimiter = (type) => {
+  if (!isRateLimitingEnabled) {
+    // Return a no-op rate limiter when disabled
+    return {
+      consume: async () => ({ remainingPoints: Infinity }),
+      block: async () => {},
+      get: async () => ({ totalHits: 0 })
+    };
+  }
+  
   if (!isRedisAvailable) {
     // Use in-memory fallback
     if (!memoryRateLimiters.has(type)) {

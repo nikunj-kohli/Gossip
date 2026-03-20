@@ -1,5 +1,6 @@
 const { verifyToken } = require('../utils/jwt');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -25,7 +26,7 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // Optional auth - doesn't fail if no token
-const optionalAuth = (req, res, next) => {
+const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
@@ -34,19 +35,28 @@ const optionalAuth = (req, res, next) => {
     return next();
   }
   
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      // Invalid token, but continue without authentication
-      return next();
-    }
+  try {
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.userId);
     
-    // Set authenticated user
-    req.user = user;
-    next();
-  });
+    if (user) {
+      req.user = user;
+    }
+  } catch (error) {
+    // Invalid token, but continue without authentication
+    console.log('Optional auth token invalid:', error.message);
+  }
+  
+  next();
 };
 
 module.exports = {
     authenticateToken,
-    optionalAuth
+    optionalAuth,
+    isAdmin: (req, res, next) => {
+        if (!req.user || req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+        next();
+    }
 };

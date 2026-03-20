@@ -12,7 +12,7 @@ const typingUsers = new Map(); // channelId -> Set of typing userIds
 function initialize(server) {
   const io = socketIO(server, {
     cors: {
-      origin: config.clientUrl,
+      origin: ["http://localhost:3000", "http://localhost:5173"], // Add Vite's default port
       methods: ["GET", "POST"],
       credentials: true
     }

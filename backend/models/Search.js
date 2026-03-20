@@ -151,7 +151,7 @@ class Search {
         conditions.push(`(
           LOWER(username) LIKE $${paramIndex} OR 
           LOWER(display_name) LIKE $${paramIndex} OR 
-          LOWER(bio) LIKE $${paramIndex}
+          LOWER(COALESCE(bio, '')) LIKE $${paramIndex}
         )`);
         params.push(paramValue);
         paramIndex++;
@@ -160,7 +160,7 @@ class Search {
       // Join conditions with OR
       const whereClause = conditions.join(' OR ');
       
-      // Build query
+      // Build simplified query for users table
       const query = `
         SELECT 
           u.id, u.username, u.display_name, u.bio, u.avatar_url, u.created_at,
@@ -182,12 +182,11 @@ class Search {
         ` : ''}
         WHERE 
           (${whereClause})
-          AND u.is_active = true
           ${currentUserId ? `AND u.id != $${paramIndex}` : ''}
         ORDER BY 
           u.display_name ASC
-        LIMIT $${paramIndex + 1}
-        OFFSET $${paramIndex + 2}
+        LIMIT $${paramIndex + (currentUserId ? 1 : 0)}
+        OFFSET $${paramIndex + 1 + (currentUserId ? 1 : 0)}
       `;
       
       // Add params
@@ -206,11 +205,11 @@ class Search {
         SELECT COUNT(*) 
         FROM users u
         WHERE (${whereClause})
-        AND u.is_active = true
-        ${currentUserId ? `AND u.id != $${paramIndex - 3}` : ''}
+        ${currentUserId ? `AND u.id != $${paramIndex - 2}` : ''}
       `;
       
-      const countResult = await db.query(countQuery, params.slice(0, currentUserId ? -3 : -2));
+      const countParams = currentUserId ? [currentUserId] : [];
+      const countResult = await db.query(countQuery, params.slice(0, currentUserId ? -2 : -2));
       const totalCount = parseInt(countResult.rows[0].count);
       
       return {
@@ -222,6 +221,7 @@ class Search {
         }
       };
     } catch (error) {
+      console.error('Search error details:', error);
       throw error;
     }
   }

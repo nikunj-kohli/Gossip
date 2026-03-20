@@ -33,6 +33,7 @@ router.get('/sent', getSentRequests); // Sent requests
 
 // Friendship status
 router.get('/users/:userId/status', checkFriendshipStatus); // Check status with another user
+router.get('/status/:username', checkFriendshipStatus); // Check status by username
 router.get('/users/:userId/mutual', getMutualFriends); // Get mutual friends
 
 module.exports = router;

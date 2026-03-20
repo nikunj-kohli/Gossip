@@ -16,7 +16,6 @@ const socketManager = require('./utils/socketManager');
 const notificationRoutes = require('./routes/notificationRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const searchRoutes = require('./routes/searchRoutes');
-const { trackPostView } = require('./middleware/postViewTracker');
 const reportRoutes = require('./routes/reportRoutes');
 const moderationRoutes = require('./routes/moderationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
@@ -29,6 +28,7 @@ const { selectiveCsrf, handleCsrfError } = require('./middleware/csrf');
 const { loginRateLimiter, passwordResetRateLimiter, registrationRateLimiter } = require('./middleware/enhancedRateLimiter');
 const { initQueryMonitoring } = require('./services/queryMonitoringService');
 const circuitBreakerService = require('./services/circuitBreakerService');
+const { authenticateToken, isAdmin } = require('./middleware/auth');
 
 const initializeServices = async () => {
   try {
@@ -65,6 +65,7 @@ app.use(handleCsrfError);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api', likeRoutes); // Note: this will use paths like /api/posts/:id/like
 app.use('/api', commentRoutes); // Note: this will use paths like /api/posts/:id/comments
 app.use('/api/friends', friendshipRoutes);
@@ -73,7 +74,6 @@ app.use('/api/conversations', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/search', searchRoutes);
-app.use('/api/posts/:postId', trackPostView);
 app.use('/api/reports', reportRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/chat', chatRoutes);
@@ -124,13 +124,6 @@ setupSwagger(app);
 
 app.use('/api', metricsRouter);
 app.use(errorMetricsMiddleware);
-
-const postRoutes = require('./routes/postRoutes');
-const commentRoutes = require('./routes/commentRoutes');
-const { postLimiter, commentLimiter, likeLimiter } = require('./middleware/rateLimiter');
-
-app.use('/api/posts', postLimiter, postRoutes);
-app.use('/api/comments', commentLimiter, commentRoutes);
 
 // Test routes
 app.get('/api/test', (req, res) => {
@@ -210,7 +203,7 @@ app.use((err, req, res, next) => {
 
 
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 Gossip Server running at http://localhost:${PORT}`);
     console.log(`📡 API Test: http://localhost:${PORT}/api/test`);
     console.log(`💾 Database Test: http://localhost:${PORT}/api/test-db`);

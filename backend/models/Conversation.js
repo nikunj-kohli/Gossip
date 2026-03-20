@@ -4,34 +4,41 @@ class Conversation {
     // Create a new conversation between users
     static async create({ creatorId, participantId, isAnonymous = false }) {
         try {
-            // Start transaction
-            await db.query('BEGIN');
+            console.log('=== CONVERSATION CREATE DEBUG ===');
+            console.log('creatorId:', creatorId);
+            console.log('participantId:', participantId);
+            console.log('isAnonymous:', isAnonymous);
             
-            // Create conversation
+            // Check if conversation already exists
+            const existingQuery = `
+                SELECT id FROM conversations 
+                WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+                LIMIT 1
+            `;
+            
+            const existingResult = await db.query(existingQuery, [creatorId, participantId]);
+            console.log('Existing conversation check:', existingResult.rows);
+            
+            if (existingResult.rows.length > 0) {
+                console.log('Returning existing conversation:', existingResult.rows[0]);
+                return existingResult.rows[0];
+            }
+            
+            // Create new conversation
+            console.log('Creating new conversation...');
             const conversationQuery = `
-                INSERT INTO conversations (created_by, is_anonymous)
-                VALUES ($1, $2)
-                RETURNING id, created_by, is_anonymous, created_at, last_message_at
+                INSERT INTO conversations (user1_id, user2_id, created_at, updated_at)
+                VALUES ($1, $2, NOW(), NOW())
+                RETURNING id, user1_id, user2_id, last_message_at, created_at, updated_at
             `;
             
-            const conversationResult = await db.query(conversationQuery, [creatorId, isAnonymous]);
-            const conversation = conversationResult.rows[0];
-            
-            // Add members to conversation
-            const memberQuery = `
-                INSERT INTO conversation_members (conversation_id, user_id)
-                VALUES ($1, $2), ($1, $3)
-            `;
-            
-            await db.query(memberQuery, [conversation.id, creatorId, participantId]);
-            
-            // Commit transaction
-            await db.query('COMMIT');
-            
-            return conversation;
+            const result = await db.query(conversationQuery, [creatorId, participantId]);
+            console.log('New conversation created:', result.rows[0]);
+            return result.rows[0];
         } catch (error) {
-            // Rollback in case of error
-            await db.query('ROLLBACK');
+            console.error('Error in Conversation.create:', error);
+            console.error('Error details:', error.message);
+            console.error('Error stack:', error.stack);
             throw error;
         }
     }
@@ -41,8 +48,8 @@ class Conversation {
         try {
             // Check if user is part of the conversation
             const memberCheck = `
-                SELECT * FROM conversation_members 
-                WHERE conversation_id = $1 AND user_id = $2
+                SELECT * FROM conversations 
+                WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)
             `;
             
             const memberResult = await db.query(memberCheck, [conversationId, userId]);
@@ -51,47 +58,36 @@ class Conversation {
                 throw new Error('User is not a member of this conversation');
             }
             
-            // Get conversation details
-            const query = `
-                SELECT 
-                    c.id, c.created_at, c.last_message_at, c.is_anonymous,
-                    (
-                        SELECT COUNT(*) 
-                        FROM messages m 
-                        WHERE m.conversation_id = c.id 
-                        AND m.sender_id != $2 
-                        AND m.is_read = false
-                        AND m.is_deleted = false
-                    ) as unread_count
-                FROM 
-                    conversations c
-                WHERE 
-                    c.id = $1
+            const conversation = memberResult.rows[0];
+            
+            // Get the other participant
+            const otherUserId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
+            
+            const participantQuery = `
+                SELECT id, username, display_name, avatar_url
+                FROM users
+                WHERE id = $1
             `;
             
-            const result = await db.query(query, [conversationId, userId]);
+            const participantResult = await db.query(participantQuery, [otherUserId]);
             
-            if (result.rows.length === 0) {
-                return null;
+            if (participantResult.rows.length > 0) {
+                conversation.participants = [participantResult.rows[0]];
+            } else {
+                conversation.participants = [];
             }
             
-            // Get other participants
-            const participantsQuery = `
-                SELECT 
-                    u.id, u.username, u.display_name, u.avatar_url
-                FROM 
-                    conversation_members cm
-                JOIN 
-                    users u ON cm.user_id = u.id
-                WHERE 
-                    cm.conversation_id = $1
-                    AND cm.user_id != $2
+            // Get unread count
+            const unreadQuery = `
+                SELECT COUNT(*) as unread_count
+                FROM messages
+                WHERE conversation_id = $1 
+                AND sender_id != $2 
+                AND is_read = false
             `;
             
-            const participantsResult = await db.query(participantsQuery, [conversationId, userId]);
-            
-            const conversation = result.rows[0];
-            conversation.participants = participantsResult.rows;
+            const unreadResult = await db.query(unreadQuery, [conversationId, userId]);
+            conversation.unread_count = parseInt(unreadResult.rows[0].unread_count);
             
             return conversation;
         } catch (error) {
@@ -104,29 +100,76 @@ class Conversation {
         try {
             // Check if conversation already exists
             const existingQuery = `
-                SELECT c.id
-                FROM conversations c
-                JOIN conversation_members cm1 ON c.id = cm1.conversation_id
-                JOIN conversation_members cm2 ON c.id = cm2.conversation_id
-                WHERE cm1.user_id = $1 AND cm2.user_id = $2
-                AND (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
+                SELECT id, user1_id, user2_id, last_message_at, created_at, updated_at
+                FROM conversations 
+                WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
                 LIMIT 1
             `;
             
             const existingResult = await db.query(existingQuery, [userId1, userId2]);
             
             if (existingResult.rows.length > 0) {
-                // Return existing conversation
-                return this.findById(existingResult.rows[0].id, userId1);
+                // Return existing conversation with basic info
+                const conversation = existingResult.rows[0];
+                
+                // Get the other participant
+                const otherUserId = conversation.user1_id === userId1 ? conversation.user2_id : conversation.user1_id;
+                
+                const participantQuery = `
+                    SELECT id, username, display_name, avatar_url
+                    FROM users
+                    WHERE id = $1
+                `;
+                
+                const participantResult = await db.query(participantQuery, [otherUserId]);
+                
+                if (participantResult.rows.length > 0) {
+                    conversation.participants = [participantResult.rows[0]];
+                } else {
+                    conversation.participants = [];
+                }
+                
+                // Get unread count
+                const unreadQuery = `
+                    SELECT COUNT(*) as unread_count
+                    FROM messages
+                    WHERE conversation_id = $1 
+                    AND sender_id != $2 
+                    AND is_read = false
+                `;
+                
+                const unreadResult = await db.query(unreadQuery, [conversation.id, userId1]);
+                conversation.unread_count = parseInt(unreadResult.rows[0].unread_count);
+                
+                return conversation;
             } else {
                 // Create new conversation
-                return this.create({
+                const conversation = await this.create({
                     creatorId: userId1,
                     participantId: userId2,
                     isAnonymous
                 });
+                
+                // Return the new conversation with participant info
+                const participantQuery = `
+                    SELECT id, username, display_name, avatar_url
+                    FROM users
+                    WHERE id = $1
+                `;
+                
+                const participantResult = await db.query(participantQuery, [userId2]);
+                
+                if (participantResult.rows.length > 0) {
+                    conversation.participants = [participantResult.rows[0]];
+                } else {
+                    conversation.participants = [];
+                }
+                
+                conversation.unread_count = 0;
+                return conversation;
             }
         } catch (error) {
+            console.error('Error in findOrCreateOneToOne:', error);
             throw error;
         }
     }
@@ -136,31 +179,27 @@ class Conversation {
         try {
             const query = `
                 SELECT 
-                    c.id, c.created_at, c.last_message_at, c.is_anonymous,
+                    c.id, c.user1_id, c.user2_id, c.last_message_at, c.created_at, c.updated_at,
                     (
                         SELECT COUNT(*) 
                         FROM messages m 
                         WHERE m.conversation_id = c.id 
                         AND m.sender_id != $1 
                         AND m.is_read = false
-                        AND m.is_deleted = false
                     ) as unread_count,
                     (
                         SELECT m.content
                         FROM messages m
                         WHERE m.conversation_id = c.id
-                        AND m.is_deleted = false
                         ORDER BY m.created_at DESC
                         LIMIT 1
                     ) as last_message
                 FROM 
                     conversations c
-                JOIN 
-                    conversation_members cm ON c.id = cm.conversation_id
                 WHERE 
-                    cm.user_id = $1
+                    c.user1_id = $1 OR c.user2_id = $1
                 ORDER BY 
-                    c.last_message_at DESC NULLS LAST
+                    c.last_message_at DESC NULLS LAST, c.created_at DESC
                 LIMIT $2 OFFSET $3
             `;
             
@@ -170,19 +209,18 @@ class Conversation {
             const conversations = [];
             
             for (const conversation of result.rows) {
+                const otherUserId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
+                
                 const participantsQuery = `
                     SELECT 
-                        u.id, u.username, u.display_name, u.avatar_url
+                        id, username, display_name, avatar_url
                     FROM 
-                        conversation_members cm
-                    JOIN 
-                        users u ON cm.user_id = u.id
+                        users
                     WHERE 
-                        cm.conversation_id = $1
-                        AND cm.user_id != $2
+                        id = $1
                 `;
                 
-                const participantsResult = await db.query(participantsQuery, [conversation.id, userId]);
+                const participantsResult = await db.query(participantsQuery, [otherUserId]);
                 
                 conversation.participants = participantsResult.rows;
                 conversations.push(conversation);
@@ -192,8 +230,7 @@ class Conversation {
             const countQuery = `
                 SELECT COUNT(*) 
                 FROM conversations c
-                JOIN conversation_members cm ON c.id = cm.conversation_id
-                WHERE cm.user_id = $1
+                WHERE c.user1_id = $1 OR c.user2_id = $1
             `;
             
             const countResult = await db.query(countQuery, [userId]);
@@ -212,12 +249,12 @@ class Conversation {
         }
     }
 
-    // Leave a conversation
+    // Leave a conversation (delete for 1-on-1 conversations)
     static async leave(conversationId, userId) {
         try {
             const query = `
-                DELETE FROM conversation_members
-                WHERE conversation_id = $1 AND user_id = $2
+                DELETE FROM conversations
+                WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)
                 RETURNING *
             `;
             
@@ -225,19 +262,6 @@ class Conversation {
             
             if (result.rows.length === 0) {
                 throw new Error('User is not a member of this conversation');
-            }
-            
-            // Check if conversation is now empty
-            const checkEmptyQuery = `
-                SELECT COUNT(*) FROM conversation_members
-                WHERE conversation_id = $1
-            `;
-            
-            const checkResult = await db.query(checkEmptyQuery, [conversationId]);
-            
-            if (parseInt(checkResult.rows[0].count) === 0) {
-                // Delete conversation if empty
-                await db.query('DELETE FROM conversations WHERE id = $1', [conversationId]);
             }
             
             return { success: true };

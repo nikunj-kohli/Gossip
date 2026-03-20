@@ -25,14 +25,24 @@ class User{
 
     // Find user by username
     static async findByUsername(username) {
-    const query = 'SELECT * FROM users WHERE username = $1';
+    const query = `
+      SELECT id, username, email, display_name, bio, avatar_url, status, 
+             email_verified, last_login, created_at, updated_at, is_active
+      FROM users 
+      WHERE username = $1
+    `;
     const result = await db.query(query, [username]);
     return result.rows[0];
     }
 
     //find user by id
     static async findById(id){
-        const query = 'SELECT id, username, email, display_name, bio, created_at FROM users WHERE id = $1';
+        const query = `
+          SELECT id, username, email, display_name, bio, avatar_url, status, 
+                 email_verified, last_login, created_at, updated_at, is_active
+          FROM users 
+          WHERE id = $1
+        `;
         const result = await db.query(query, [id]);
         return result.rows[0];
     }

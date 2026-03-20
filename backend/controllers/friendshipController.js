@@ -1,6 +1,32 @@
 const Friendship = require('../models/Friendship');
 const User = require('../models/User');
 
+// Check friendship status
+const checkFriendshipStatus = async (req, res) => {
+    try {
+        const { username } = req.params;
+        const currentUserId = req.user.id;
+        
+        // Get target user by username
+        const targetUser = await User.findByUsername(username);
+        if (!targetUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Check friendship status
+        const friendship = await Friendship.getFriendshipStatus(currentUserId, targetUser.id);
+        
+        res.json({
+            isFriend: friendship && friendship.status === 'accepted',
+            status: friendship?.status || 'none',
+            friendship: friendship
+        });
+    } catch (error) {
+        console.error('Error checking friendship status:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 // Send friend request
 const sendFriendRequest = async (req, res) => {
     try {
@@ -137,11 +163,15 @@ const getFriends = async (req, res) => {
         
         const result = await Friendship.getFriends(userId, limit, offset);
         
-        res.json(result);
+        // ALWAYS return an array, even if empty
+        const friends = result.friends || [];
+        
+        res.json(friends);
         
     } catch (error) {
         console.error('Error getting friends:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        // Always return empty array on error to prevent frontend crashes
+        res.status(500).json([]);
     }
 };
 
@@ -154,11 +184,15 @@ const getPendingRequests = async (req, res) => {
         
         const result = await Friendship.getPendingRequests(userId, limit, offset);
         
-        res.json(result);
+        // ALWAYS return an array, even if empty
+        const requests = result.requests || [];
+        
+        res.json(requests);
         
     } catch (error) {
         console.error('Error getting friend requests:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        // Always return empty array on error to prevent frontend crashes
+        res.status(500).json([]);
     }
 };
 
@@ -171,33 +205,15 @@ const getSentRequests = async (req, res) => {
         
         const result = await Friendship.getSentRequests(userId, limit, offset);
         
-        res.json(result);
+        // ALWAYS return an array, even if empty
+        const sent = result.sent || [];
+        
+        res.json(sent);
         
     } catch (error) {
         console.error('Error getting sent requests:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-};
-
-// Check friendship status with another user
-const checkFriendshipStatus = async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const currentUserId = req.user.id;
-        
-        // Validate target user exists
-        const targetUser = await User.findById(userId);
-        if (!targetUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        
-        const result = await Friendship.checkFriendshipStatus(currentUserId, userId);
-        
-        res.json(result);
-        
-    } catch (error) {
-        console.error('Error checking friendship status:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        // Always return empty array on error to prevent frontend crashes
+        res.status(500).json([]);
     }
 };
 

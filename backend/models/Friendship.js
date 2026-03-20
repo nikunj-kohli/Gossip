@@ -1,6 +1,23 @@
 const db = require('../config/database');
 
 class Friendship {
+    // Get friendship status between two users
+    static async getFriendshipStatus(userId1, userId2) {
+        try {
+            const query = `
+                SELECT * FROM friendships 
+                WHERE (requester_id = $1 AND addressee_id = $2)
+                   OR (requester_id = $2 AND addressee_id = $1)
+                ORDER BY created_at DESC
+                LIMIT 1
+            `;
+            const result = await db.query(query, [userId1, userId2]);
+            return result.rows[0] || null;
+        } catch (error) {
+            throw error;
+        }
+    }
+
     // Send friend request
     static async sendRequest(requesterId, addresseeId) {
         try {

@@ -4,9 +4,8 @@ const searchController = require('../controllers/searchController');
 
 const router = express.Router();
 
-// Public search routes with optional authentication
-router.get('/posts', optionalAuth, searchController.searchPosts);
-router.get('/users', optionalAuth, searchController.searchUsers);
+// Public search routes without authentication for basic user search
+router.get('/users', searchController.searchUsers);
 router.get('/all', optionalAuth, searchController.searchAll);
 router.get('/trending', optionalAuth, searchController.getTrendingPosts);
 

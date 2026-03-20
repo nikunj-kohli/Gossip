@@ -1,20 +1,35 @@
 const Redis = require('ioredis');
 const config = require('../config/config');
-const { RateLimiterRedis } = require('rate-limiter-flexible');
+const { RateLimiterRedis, RateLimiterMemory } = require('rate-limiter-flexible');
 
-// Connect to Redis
-const redisClient = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password,
-  enableOfflineQueue: false
+let redisClient;
+
+try {
+  redisClient = new Redis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT) || 6379,
+  password: process.env.REDIS_PASSWORD,  // ADD THIS LINE
+  retryDelayOnFailover: 100,
+  maxRetriesPerRequest: 3,
+  // Add connection timeout
+  connectTimeout: 10000,
+  // Enable ready check
+  enableReadyCheck: true
 });
+} catch (error) {
+  console.warn('Redis not available, falling back to memory rate limiter');
+}
 
 // Configure rate limiters for different types of requests
 const rateLimiters = {
   // General API requests
-  api: new RateLimiterRedis({
+  api: redisClient ? new RateLimiterRedis({
     storeClient: redisClient,
+    keyPrefix: 'ratelimit:api',
+    points: 100, // Number of requests
+    duration: 60, // Per minute
+    blockDuration: 60 // Block for 1 minute if exceeded
+  }) : new RateLimiterMemory({
     keyPrefix: 'ratelimit:api',
     points: 100, // Number of requests
     duration: 60, // Per minute
@@ -22,8 +37,13 @@ const rateLimiters = {
   }),
   
   // Auth requests (login, register, etc.)
-  auth: new RateLimiterRedis({
+  auth: redisClient ? new RateLimiterRedis({
     storeClient: redisClient,
+    keyPrefix: 'ratelimit:auth',
+    points: 20, // Number of requests
+    duration: 60 * 60, // Per hour
+    blockDuration: 60 * 10 // Block for 10 minutes if exceeded
+  }) : new RateLimiterMemory({
     keyPrefix: 'ratelimit:auth',
     points: 20, // Number of requests
     duration: 60 * 60, // Per hour
@@ -31,8 +51,13 @@ const rateLimiters = {
   }),
   
   // Post creation
-  post: new RateLimiterRedis({
+  post: redisClient ? new RateLimiterRedis({
     storeClient: redisClient,
+    keyPrefix: 'ratelimit:post',
+    points: 30, // Number of posts
+    duration: 60 * 60, // Per hour
+    blockDuration: 60 * 5 // Block for 5 minutes if exceeded
+  }) : new RateLimiterMemory({
     keyPrefix: 'ratelimit:post',
     points: 30, // Number of posts
     duration: 60 * 60, // Per hour
@@ -40,8 +65,13 @@ const rateLimiters = {
   }),
   
   // Comment creation
-  comment: new RateLimiterRedis({
+  comment: redisClient ? new RateLimiterRedis({
     storeClient: redisClient,
+    keyPrefix: 'ratelimit:comment',
+    points: 60, // Number of comments
+    duration: 60 * 60, // Per hour
+    blockDuration: 60 * 5 // Block for 5 minutes if exceeded
+  }) : new RateLimiterMemory({
     keyPrefix: 'ratelimit:comment',
     points: 60, // Number of comments
     duration: 60 * 60, // Per hour
@@ -49,8 +79,13 @@ const rateLimiters = {
   }),
   
   // Like/unlike actions
-  like: new RateLimiterRedis({
+  like: redisClient ? new RateLimiterRedis({
     storeClient: redisClient,
+    keyPrefix: 'ratelimit:like',
+    points: 100, // Number of likes
+    duration: 60 * 60, // Per hour
+    blockDuration: 60 * 2 // Block for 2 minutes if exceeded
+  }) : new RateLimiterMemory({
     keyPrefix: 'ratelimit:like',
     points: 100, // Number of likes
     duration: 60 * 60, // Per hour

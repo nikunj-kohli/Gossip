@@ -360,6 +360,8 @@ class Post {
     // Get posts visible to user (public + friends-only from friends)
     static async getVisibleToUser(userId, limit = 20, offset = 0) {
         try {
+            console.log('getVisibleToUser called for userId:', userId, 'limit:', limit, 'offset:', offset);
+            
             // Get user's friends
             const friendsQuery = `
                 SELECT 
@@ -372,11 +374,17 @@ class Post {
                 AND status = 'accepted'
             `;
             
-            const friendsResult = await db.query(friendsQuery, [userId]);
-            const friendIds = friendsResult.rows.map(row => row.friend_id);
+            let friendIds = [parseInt(userId)]; // Default to just user's own posts
+            let groupIds = []; // Default to empty
             
-            // Add user's own ID to see their own posts
-            friendIds.push(parseInt(userId));
+            try {
+                const friendsResult = await db.query(friendsQuery, [userId]);
+                friendIds = friendsResult.rows.map(row => row.friend_id);
+                friendIds.push(parseInt(userId)); // Add user's own ID
+            } catch (friendError) {
+                console.error('Error fetching friends, using empty array:', friendError.message);
+                // friendIds already contains just user's ID
+            }
             
             // Get user's group memberships
             const groupsQuery = `
@@ -385,8 +393,13 @@ class Post {
                 WHERE user_id = $1 AND status = 'active'
             `;
             
-            const groupsResult = await db.query(groupsQuery, [userId]);
-            const groupIds = groupsResult.rows.map(row => row.group_id);
+            try {
+                const groupsResult = await db.query(groupsQuery, [userId]);
+                groupIds = groupsResult.rows.map(row => row.group_id);
+            } catch (groupError) {
+                console.error('Error fetching groups, using empty array:', groupError.message);
+                // groupIds already empty
+            }
             
             let postsQuery = `
                 SELECT 
@@ -440,7 +453,8 @@ class Post {
                 limit, 
                 offset
             ]);
-                
+            
+            console.log('getVisibleToUser returning', result.rows.length, 'posts');
             return result.rows;
         } catch (error) {
             throw error;

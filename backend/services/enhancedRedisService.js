@@ -3,8 +3,16 @@ const config = require('../config/config');
 const { logger } = require('./loggingService');
 const { executeWithBreaker } = require('./circuitBreakerService');
 
+// Check if caching is enabled
+const isCachingEnabled = process.env.ENABLE_CACHING === 'true';
+
 // Create Redis client with reconnection logic
 const createRedisClient = () => {
+  if (!isCachingEnabled) {
+    logger.info('Caching is disabled');
+    return null;
+  }
+
   const client = new Redis({
     host: config.redis.host,
     port: config.redis.port,
@@ -41,6 +49,11 @@ const memoryCache = new Map();
 
 // Set a value with circuit breaker
 const set = async (key, value, expiration = 3600) => {
+  if (!isCachingEnabled || !redisClient) {
+    // No-op when caching is disabled or Redis is unavailable
+    return true;
+  }
+
   const valueToStore = typeof value === 'object' ? JSON.stringify(value) : value;
   
   return executeWithBreaker(
@@ -67,6 +80,11 @@ const set = async (key, value, expiration = 3600) => {
 
 // Get a value with circuit breaker
 const get = async (key) => {
+  if (!isCachingEnabled || !redisClient) {
+    // Return null when caching is disabled or Redis is unavailable
+    return null;
+  }
+
   return executeWithBreaker(
     'redis-get',
     async () => {
@@ -121,12 +139,16 @@ const del = async (key) => {
 
 // Check health of Redis
 const healthCheck = async () => {
+  if (!isCachingEnabled || !redisClient) {
+    return { status: 'disabled', message: 'Caching is disabled' };
+  }
+
   try {
     const result = await redisClient.ping();
-    return result === 'PONG';
+    return { status: 'healthy', result };
   } catch (error) {
     logger.error('Redis health check failed:', error);
-    return false;
+    return { status: 'unhealthy', error: error.message };
   }
 };
 
