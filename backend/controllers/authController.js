@@ -111,8 +111,20 @@ const getProfile = async (req, res) => {
     }
 };
 
+// Validate token
+const validateToken = async (req, res) => {
+    try {
+        // If we reach here, the token is valid (due to authenticateToken middleware)
+        res.json({ valid: true, user: req.user });
+    } catch (error) {
+        console.error('Token validation error:', error);
+        res.status(500).json({ valid: false });
+    }
+};
+
 module.exports = {
     register,
     login,
-    getProfile
+    getProfile,
+    validateToken
 };

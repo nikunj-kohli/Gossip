@@ -174,7 +174,10 @@ exports.sendMessage = async (req, res) => {
             io.to(`conversation:${conversationId}`).emit('message:received', {
                 ...message,
                 conversationId: parseInt(conversationId),
-                senderId: currentUserId
+                senderId: currentUserId,
+                // Ensure field names match frontend expectations
+                message_type: message.message_type || message.messageType,
+                messageType: message.message_type || message.messageType
             });
             
             // Emit conversation update to update conversation list

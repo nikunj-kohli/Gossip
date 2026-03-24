@@ -13,19 +13,21 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Add response interceptor to handle 403 errors
+// Add response interceptor to handle 401 and 403 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 403) {
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       // Token might be expired or invalid
-      console.error('403 Forbidden - Token expired or invalid');
+      console.error('🚪', error.response.status, '- Token expired or invalid');
+      console.log('🧹 Clearing localStorage and redirecting...');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Redirect to login page
@@ -185,13 +187,17 @@ export const getCommunityMembers = async (communityId) => {
 };
 
 // Friends (using backend API)
-export const getFriends = async () => {
+export const getFriends = async ({ signal } = {}) => {
   try {
-    const response = await api.get('/friends/friends');
+    const response = await api.get('/friends/friends', { signal });
     return { data: response.data, error: null };
   } catch (error) {
+    if (error.name === 'CanceledError') {
+      console.log('getFriends request canceled');
+      throw error;
+    }
     console.error('Error fetching friends:', error);
-    return { data: null, error };
+    return { data: [], error };
   }
 };
 
@@ -215,13 +221,19 @@ export const getSentRequests = async () => {
   }
 };
 
-export const sendFriendRequest = async (userId) => {
+export const sendFriendRequest = async (friendId) => {
   try {
-    const response = await api.post(`/friends/users/${userId}/request`);
+    // Validate friendId
+    if (!friendId || isNaN(parseInt(friendId))) {
+      return { data: null, error: { message: 'Invalid user ID' } };
+    }
+    
+    console.log('Sending friend request to user ID:', friendId);
+    const response = await api.post(`/friends/users/${friendId}/request`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error sending friend request:', error);
-    return { data: null, error };
+    console.error('Error sending friend request:', error.response?.data || error.message);
+    return { data: null, error: error.response?.data || error };
   }
 };
 
@@ -266,13 +278,17 @@ export const getMutualFriends = async (userId) => {
 };
 
 // Messages (using backend API)
-export const getConversations = async () => {
+export const getConversations = async ({ signal } = {}) => {
   try {
-    const response = await api.get('/conversations');
+    const response = await api.get('/conversations', { signal });
     return { data: response.data, error: null };
   } catch (error) {
+    if (error.name === 'CanceledError') {
+      console.log('getConversations request canceled');
+      throw error;
+    }
     console.error('Error fetching conversations:', error);
-    return { data: null, error };
+    throw error;
   }
 };
 
@@ -366,3 +382,5 @@ export const getUserPosts = async (userId) => {
     return { data: null, error };
   }
 };
+
+export { api };

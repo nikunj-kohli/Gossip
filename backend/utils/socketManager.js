@@ -76,28 +76,28 @@ function initialize(server) {
       }
     });
     
-    // Handle chat messages
-    socket.on('message:send', async (data) => {
-      try {
-        // This would be handled by a chat controller
-        // Here we just emit back to the appropriate room
-        if (data.conversationId) {
-          io.to(`conversation:${data.conversationId}`).emit('message:received', {
-            ...data,
-            sender: {
-              id: userId,
-              username: socket.user.username,
-              displayName: socket.user.displayName,
-              avatarUrl: socket.user.avatarUrl
-            },
-            timestamp: new Date()
-          });
-        }
-      } catch (error) {
-        console.error('Error handling message:', error);
-        socket.emit('error', { message: 'Error sending message' });
-      }
-    });
+    // Handle chat messages (removed - now handled by HTTP API)
+    // socket.on('message:send', async (data) => {
+    //   try {
+    //     // This would be handled by a chat controller
+    //     // Here we just emit back to the appropriate room
+    //     if (data.conversationId) {
+    //       io.to(`conversation:${data.conversationId}`).emit('message:received', {
+    //         ...data,
+    //         sender: {
+    //           id: userId,
+    //           username: socket.user.username,
+    //           displayName: socket.user.displayName,
+    //           avatarUrl: socket.user.avatarUrl
+    //         },
+    //         timestamp: new Date()
+    //       });
+    //     }
+    //   } catch (error) {
+    //     console.error('Error handling message:', error);
+    //     socket.emit('error', { message: 'Error sending message' });
+    //   }
+    // });
     
     // Handle typing indicators
     socket.on('typing:start', (data) => {

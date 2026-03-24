@@ -52,7 +52,17 @@ function App() {
                 <CommunitiesPage />
               </ProtectedRoute>
             } />
+            <Route path="/community/:id" element={
+              <ProtectedRoute>
+                <CommunitiesPage />
+              </ProtectedRoute>
+            } />
             <Route path="/friends" element={
+              <ProtectedRoute>
+                <FriendsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/friends/:username" element={
               <ProtectedRoute>
                 <FriendsPage />
               </ProtectedRoute>

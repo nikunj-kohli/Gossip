@@ -27,7 +27,10 @@ class Message {
             const message = result.rows[0];
             return {
                 ...message,
-                created_at: message.created_at.toISOString()
+                created_at: message.created_at.toISOString(),
+                // Ensure consistent field naming for frontend
+                messageType: message.message_type,
+                message_type: message.message_type
             };
         } catch (error) {
             throw error;
@@ -69,7 +72,10 @@ class Message {
             // Format timestamps to ISO strings for consistent frontend handling
             return result.rows.map(message => ({
                 ...message,
-                created_at: message.created_at.toISOString()
+                created_at: message.created_at.toISOString(),
+                // Ensure consistent field naming for frontend
+                messageType: message.message_type,
+                message_type: message.message_type
             }));
         } catch (error) {
             throw error;

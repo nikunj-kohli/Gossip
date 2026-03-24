@@ -24,6 +24,27 @@ const FriendsPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Debug: Log when friends state changes
+  useEffect(() => {
+    console.log('Friends state changed:', friends);
+  }, [friends]);
+
+  // Helper functions to check friendship status
+  const isAlreadyFriend = (userId) => {
+    return friends.some(friend => friend.id === userId);
+  };
+
+  const hasPendingRequest = (userId) => {
+    return friendRequests.some(request => 
+      request.user_id === userId && request.status === 'pending'
+    );
+  };
+
+  const hasSentRequest = (userId) => {
+    // This would require tracking sent requests, for now we'll use a simple approach
+    return false; // TODO: Implement sent requests tracking
+  };
+
   useEffect(() => {
     fetchFriendsData();
   }, []);
@@ -50,7 +71,40 @@ const FriendsPage = () => {
         console.error('Error searching users:', error);
         setSearchResults([]);
       } else {
-        setSearchResults(data?.users || []);
+        const usersWithStatus = await Promise.all(
+          (data?.users || []).map(async (user) => {
+            try {
+              const statusResult = await checkFriendshipStatus(user.username);
+              const status = statusResult.data?.status || 'none';
+              const isFriend = statusResult.data?.isFriend || false;
+              
+              // Map backend status to frontend status
+              let friendshipStatus = 'none';
+              if (isFriend) {
+                friendshipStatus = 'friends';
+              } else if (status === 'pending') {
+                // Check direction of pending request
+                if (statusResult.data?.friendship?.requester_id === user.id) {
+                  friendshipStatus = 'pending_received';
+                } else {
+                  friendshipStatus = 'pending_sent';
+                }
+              }
+              
+              return {
+                ...user,
+                friendship_status: friendshipStatus
+              };
+            } catch (statusError) {
+              console.error('Error checking friendship status:', statusError);
+              return {
+                ...user,
+                friendship_status: 'none'
+              };
+            }
+          })
+        );
+        setSearchResults(usersWithStatus);
       }
     } catch (error) {
       console.error('Error searching users:', error);
@@ -71,18 +125,25 @@ const FriendsPage = () => {
         getSentRequests()
       ]);
 
+      console.log('Friends API response:', friendsRes);
+      console.log('Pending requests API response:', requestsRes);
+      console.log('Sent requests API response:', sentRes);
+
       // SAFETY CHECKS - Ensure data is always an array
       const friendsData = Array.isArray(friendsRes.data) ? friendsRes.data : [];
       const pendingData = Array.isArray(requestsRes.data) ? requestsRes.data : [];
       const sentData = Array.isArray(sentRes.data) ? sentRes.data : [];
 
-      console.log('Friends data:', friendsData);
-      console.log('Pending requests:', pendingData);
-      console.log('Sent requests:', sentData);
+      console.log('Final friends data:', friendsData);
+      console.log('Final pending requests:', pendingData);
+      console.log('Final sent requests:', sentData);
 
+      console.log('About to set friends - friendsRes.error:', friendsRes.error);
+      console.log('About to set friends - friendsData:', friendsData);
       if (friendsRes.error) {
         console.error('Error fetching friends:', friendsRes.error);
       } else {
+        console.log('Setting friends state with:', friendsData);
         setFriends(friendsData);
       }
 
@@ -231,15 +292,37 @@ const FriendsPage = () => {
 
   const handleSendFriendRequest = async (friendId) => {
     try {
+      console.log('Attempting to send friend request to:', friendId);
       const result = await sendFriendRequest(friendId);
       if (result.error) {
         console.error('Error sending friend request:', result.error);
-        alert('Failed to send friend request');
+        const errorMessage = result.error?.message || result.error || 'Failed to send friend request';
+        
+        // Show user-friendly error messages
+        if (errorMessage.includes('already friends')) {
+          alert('You are already friends with this user');
+        } else if (errorMessage.includes('already sent')) {
+          alert('Friend request already sent to this user');
+        } else if (errorMessage.includes('already sent you a friend request')) {
+          alert('This user has already sent you a friend request');
+        } else {
+          alert(errorMessage);
+        }
         return;
       }
 
       // Update local state
       setSuggestedFriends(suggestedFriends.filter(friend => friend.id !== friendId));
+      
+      // Update search results to show "Request Sent" status
+      setSearchResults(prevResults => 
+        prevResults.map(user => 
+          user.id === friendId 
+            ? { ...user, friendship_status: 'pending_sent' }
+            : user
+        )
+      );
+      
       alert('Friend request sent!');
     } catch (error) {
       console.error('Error sending friend request:', error);
@@ -266,11 +349,17 @@ const FriendsPage = () => {
   };
 
   const filteredFriends = (Array.isArray(friends) ? friends : []).filter(friend =>
+    !searchQuery.trim() || 
     friend.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     friend.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  console.log('Search query:', searchQuery);
+  console.log('Friends array:', friends);
+  console.log('Filtered friends:', filteredFriends);
+
   const filteredSuggested = (Array.isArray(suggestedFriends) ? suggestedFriends : []).filter(friend =>
+    !searchQuery.trim() || 
     friend.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     friend.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );

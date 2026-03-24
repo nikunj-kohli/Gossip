@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { authAPI } from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({
@@ -8,6 +9,7 @@ const LoginPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { login } = useContext(AuthContext);
 
   const handleChange = (e) => {
     setFormData({
@@ -24,9 +26,8 @@ const LoginPage = () => {
     try {
       const response = await authAPI.login(formData);
       
-      // Store token and user data
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Use AuthContext login method
+      login(response.data.token, response.data.user);
       
       // Redirect to dashboard
       window.location.href = '/dashboard';

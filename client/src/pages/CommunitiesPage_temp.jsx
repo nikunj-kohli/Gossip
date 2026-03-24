@@ -15,7 +15,7 @@ const CommunitiesPage = () => {
     try {
       setLoading(true);
       const { data, error } = await getCommunities();
-
+      
       if (error) {
         console.error('Error fetching communities:', error);
         setCommunities([]);
@@ -31,7 +31,7 @@ const CommunitiesPage = () => {
     }
   };
 
-  const filteredCommunities = selectedCategory === 'all'
+  const filteredCommunities = selectedCategory === 'all' 
     ? (Array.isArray(communities) ? communities : [])
     : (Array.isArray(communities) ? communities.filter(community => community.category === selectedCategory) : []);
 
@@ -97,32 +97,32 @@ const CommunitiesPage = () => {
                       />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              g/{community.name ? community.name.toLowerCase().replace(/\s+/g, '') : 'unknown'}
-                            </h3>
-                            <p className="text-sm text-gray-600 mt-1">{community.description || 'No description available'}</p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
-                              {community.type || 'Public'}
-                            </span>
-                            <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700">
-                              General
-                            </span>
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                g/{community.name ? community.name.toLowerCase().replace(/\s+/g, '') : 'unknown'}
+                              </h3>
+                              <p className="text-sm text-gray-600 mt-1">{community.description || 'No description available'}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                                {community.type || 'Public'}
+                              </span>
+                              <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                                General
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => console.log('Join community:', community.id)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                            >
+                              Join
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => console.log('Join community:', community.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium mt-3"
-                        >
-                          Join
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))}
+                )}
+              </div>
             </div>
           </div>
 
