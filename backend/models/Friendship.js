@@ -26,15 +26,6 @@ class Friendship {
                 SELECT * FROM friendships 
                 WHERE (requester_id = $1 AND addressee_id = $2)
                    OR (requester_id = $2 AND addressee_id = $1)
-                ORDER BY
-                    CASE
-                        WHEN status = 'accepted' THEN 0
-                        WHEN status = 'pending' THEN 1
-                        ELSE 2
-                    END,
-                    updated_at DESC,
-                    created_at DESC,
-                    id DESC
             `;
             const checkResult = await db.query(checkQuery, [requesterId, addresseeId]);
             
@@ -362,16 +353,6 @@ class Friendship {
                 SELECT * FROM friendships
                 WHERE (requester_id = $1 AND addressee_id = $2)
                    OR (requester_id = $2 AND addressee_id = $1)
-                ORDER BY
-                    CASE
-                        WHEN status = 'accepted' THEN 0
-                        WHEN status = 'pending' THEN 1
-                        ELSE 2
-                    END,
-                    updated_at DESC,
-                    created_at DESC,
-                    id DESC
-                LIMIT 1
             `;
             const result = await db.query(query, [userId1, userId2]);
             
