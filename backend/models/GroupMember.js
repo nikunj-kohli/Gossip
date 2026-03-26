@@ -1,6 +1,37 @@
 const db = require('../config/database');
 
 class GroupMember {
+    // Compatibility helper for callers using Sequelize-style API.
+    static async findOne(options = {}) {
+        const where = options.where || {};
+        const groupId = where.group_id || where.groupId;
+        const userId = where.user_id || where.userId;
+
+        if (!groupId || !userId) {
+            return null;
+        }
+
+        const query = `
+            SELECT id, group_id, user_id, role, is_banned, joined_at
+            FROM group_members
+            WHERE group_id = $1 AND user_id = $2 AND is_banned = FALSE
+            LIMIT 1
+        `;
+
+        const result = await db.query(query, [groupId, userId]);
+        return result.rows[0] || null;
+    }
+
+    static async isMember(groupId, userId) {
+        const membership = await this.findOne({ where: { group_id: groupId, user_id: userId } });
+
+        if (!membership) {
+            return { success: false, message: 'You are not a member of this group' };
+        }
+
+        return { success: true, membership };
+    }
+
     // Join a group
     static async join(groupId, userId) {
         try {
