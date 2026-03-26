@@ -606,6 +606,48 @@ class Group {
     }
 
     // Check if user can post in group
+    static async checkAccess(groupId, userId = null) {
+        try {
+            const groupQuery = `
+                SELECT id, privacy, is_active
+                FROM groups
+                WHERE id = $1
+                LIMIT 1
+            `;
+            const groupResult = await db.query(groupQuery, [groupId]);
+
+            if (!groupResult.rows.length || !groupResult.rows[0].is_active) {
+                return { access: false, message: 'Group not found' };
+            }
+
+            const group = groupResult.rows[0];
+            if (group.privacy === 'public') {
+                return { access: true };
+            }
+
+            if (!userId) {
+                return { access: false, message: 'You must join this private group to view posts' };
+            }
+
+            const memberQuery = `
+                SELECT 1
+                FROM group_members
+                WHERE group_id = $1 AND user_id = $2 AND is_banned = FALSE
+                LIMIT 1
+            `;
+            const memberResult = await db.query(memberQuery, [groupId, userId]);
+
+            if (!memberResult.rows.length) {
+                return { access: false, message: 'You must join this private group to view posts' };
+            }
+
+            return { access: true };
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    // Check if user can post in group
     static async canUserPost(groupId, userId) {
         try {
             // First check if group exists and is active
