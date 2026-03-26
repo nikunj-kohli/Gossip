@@ -76,8 +76,9 @@ const createRequestLogger = () => {
     requestLogger.add(new winston.transports.Console({
       format: format.combine(
         format.colorize(),
-        format.printf(({ timestamp, level, method, path, status, responseTime, userId, ip, ...meta }) => {
-          return `[${timestamp}] ${level}: ${method} ${path} ${status} ${responseTime}ms ${userId ? `User: ${userId}` : `IP: ${ip}`} ${
+        format.printf(({ timestamp, level, message, ...meta }) => {
+          const logData = typeof message === 'object' ? message : {};
+          return `[${timestamp}] ${level}: ${logData.method || 'undefined'} ${logData.path || 'undefined'} ${logData.status || 'undefined'} ${logData.responseTime || 'undefined'}ms ${logData.userId ? `User: ${logData.userId}` : `IP: ${logData.ip || 'undefined'}`} ${
             Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
           }`;
         })

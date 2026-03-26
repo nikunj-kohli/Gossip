@@ -27,10 +27,11 @@ function initialize(server) {
     }
     
     try {
-      const decoded = jwt.verify(token, config.jwtSecret);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || config.auth.jwtSecret);
       socket.user = decoded;
       next();
     } catch (error) {
+      console.error('Socket auth error:', error.message);
       next(new Error('Authentication error: Invalid token'));
     }
   });
@@ -40,7 +41,16 @@ function initialize(server) {
     console.log(`Socket connected: ${socket.id}`);
     
     // Store user-socket mapping (multiple sockets per user supported)
-    const userId = socket.user.id;
+    const userId = socket.user?.id || socket.user?.userId;
+
+    if (!userId) {
+      console.error(`Socket ${socket.id} missing user id in JWT payload`);
+      socket.disconnect(true);
+      return;
+    }
+
+    // Normalize for downstream handlers that read socket.user.id.
+    socket.user.id = userId;
     
     // Add socket to user's set of sockets
     if (!userSocketMap.has(userId)) {
@@ -234,7 +244,7 @@ async function broadcastUserStatus(userId, status) {
     
     // We'd normally fetch this user's friends from the database
     // For now, we'll emit to all users
-    io.emit('friend:status', {
+    io.emit('connection:status', {
       userId,
       status
     });

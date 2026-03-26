@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { getUserProfile, checkFriendshipStatus, startConversation, createPost, getUserPosts, toggleLike, updatePost, deletePost } from '../api';
+import { getUserProfile, checkMessagingAccessStatus, startInboxConversation, createPost, getUserPosts, getPostById, toggleLike, updatePost, deletePost, sendMessageRequest } from '../api';
 
 const ProfilePage = () => {
   const { username } = useParams();
@@ -10,7 +10,7 @@ const ProfilePage = () => {
   const [profileUser, setProfileUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
-  const [isFriend, setIsFriend] = useState(false);
+  const [canMessage, setCanMessage] = useState(false);
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,14 +32,14 @@ const ProfilePage = () => {
           // Check friendship status if not current user
           if (currentUser?.username !== username) {
             console.log('Checking friendship status for:', username);
-            const friendshipResult = await checkFriendshipStatus(username);
+            const friendshipResult = await checkMessagingAccessStatus(username);
             console.log('Friendship result:', friendshipResult);
             if (!friendshipResult.error) {
-              console.log('Setting isFriend to:', friendshipResult.data.isFriend);
-              setIsFriend(friendshipResult.data.isFriend);
+              console.log('Setting canMessage to:', friendshipResult.data.canMessage);
+              setCanMessage(Boolean(friendshipResult.data.canMessage));
             } else {
               console.log('Friendship check error:', friendshipResult.error);
-              setIsFriend(false);
+              setCanMessage(false);
             }
           }
           
@@ -75,13 +75,18 @@ const ProfilePage = () => {
     }
   };
 
-  const handleSendFriendRequest = () => {
-    // TODO: Implement friend request with note
-    const note = prompt('Add a note to your friend request (optional):');
-    if (note !== null) {
-      console.log('Sending friend request to:', username, 'with note:', note);
-      // TODO: Call friend request API
-      alert('Friend request functionality coming soon!');
+  const handleSendMessageRequest = async () => {
+    try {
+      if (!profileUser?.id) return;
+      const { error } = await sendMessageRequest(profileUser.id);
+      if (error) {
+        alert(error.response?.data?.message || 'Failed to send request');
+        return;
+      }
+      alert('Message request sent.');
+    } catch (error) {
+      console.error('Error sending request:', error);
+      alert('Failed to send request');
     }
   };
 
@@ -232,18 +237,83 @@ const ProfilePage = () => {
       }
       
       console.log('Using user ID:', userId);
-      const { data, error } = await startConversation(userId);
+      const { data, error } = await startInboxConversation(userId);
       if (error) {
         console.error('Error starting conversation:', error);
         alert('Failed to start conversation');
       } else {
         console.log('Conversation started:', data);
         // Navigate to messages with the conversation ID
-        navigate(`/messages/${data.conversationId || data.id}`);
+        navigate(`/inbox/${data.conversationId || data.id}`);
       }
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to start conversation');
+    }
+  };
+
+  const slugifyText = (text = 'post') =>
+    String(text)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60) || 'post';
+
+  const formatDateToken = (value) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+    return `${dd}${mm}${yyyy}`;
+  };
+
+  const encodePostToken = (postId, createdAt) => {
+    const ts = new Date(createdAt).getTime();
+    if (!postId || Number.isNaN(ts)) return null;
+    return btoa(`${postId}:${ts}`)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  };
+
+  const buildPermalinkFromPost = (post) => {
+    if (!post?.id || !post?.created_at) return null;
+    const headline = slugifyText(post.content || 'post');
+    const dateToken = formatDateToken(post.created_at);
+    const token = encodePostToken(post.id, post.created_at);
+    if (!dateToken || !token) return null;
+
+    if (post.group_slug || post.group_name || post.group_id) {
+      const communitySegment = post.group_slug || slugifyText(post.group_name || 'community') || String(post.group_id);
+      return `/c/${communitySegment}/${headline}/${dateToken}-${token}`;
+    }
+
+    return `/p/${headline}/${dateToken}-${token}`;
+  };
+
+  const openPostDetail = async (post) => {
+    try {
+      if (post?.permalink) {
+        navigate(`${post.permalink}#comments`);
+        return;
+      }
+
+      const localPermalink = buildPermalinkFromPost(post);
+      if (localPermalink) {
+        navigate(`${localPermalink}#comments`);
+        return;
+      }
+
+      if (!post?.id) return;
+      const { data, error } = await getPostById(post.id);
+      if (error || !data?.permalink) return;
+      navigate(`${data.permalink}#comments`);
+    } catch (error) {
+      console.error('Error opening post detail:', error);
     }
   };
 
@@ -271,20 +341,6 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">Profile</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/feed" className="text-gray-600 hover:text-blue-600">← Back to Feed</Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
@@ -310,15 +366,15 @@ const ProfilePage = () => {
                 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  {!isCurrentUser && !isFriend && (
+                  {!isCurrentUser && !canMessage && (
                     <button 
-                      onClick={handleSendFriendRequest}
+                      onClick={handleSendMessageRequest}
                       className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      Send Friend Request
+                      Request to Message
                     </button>
                   )}
-                  {!isCurrentUser && isFriend && (
+                  {!isCurrentUser && canMessage && (
                     <>
                       <button 
                         onClick={handleMessageUser}
@@ -326,9 +382,7 @@ const ProfilePage = () => {
                       >
                         Message
                       </button>
-                      <button className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
-                        Friends
-                      </button>
+                      <span className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg">Connected</span>
                     </>
                   )}
                   {isCurrentUser && (
@@ -354,14 +408,14 @@ const ProfilePage = () => {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Posts</h2>
             <div className="flex items-center space-x-2 text-sm text-gray-600">
-              {isFriend && (
+              {canMessage && (
                 <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                  Friends
+                  Can Message
                 </span>
               )}
-              {!isFriend && !isCurrentUser && (
+              {!canMessage && !isCurrentUser && (
                 <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
-                  Not Friends
+                  Request Required
                 </span>
               )}
             </div>
@@ -412,7 +466,7 @@ const ProfilePage = () => {
           )}
           
           {/* Posts Display */}
-          {(isCurrentUser || isFriend) && (
+          {(isCurrentUser || canMessage) && (
             <div className="space-y-4">
               {posts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -436,7 +490,14 @@ const ProfilePage = () => {
                             <h4 className="font-semibold text-gray-900">
                               {post.is_anonymous ? 'Anonymous' : profileUser?.display_name || profileUser?.username}
                             </h4>
-                            <span className="text-xs text-gray-500">{formatTimeAgo(post.created_at)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{formatTimeAgo(post.created_at)}</span>
+                              {post.group_name && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                                  c/{post.group_slug || post.group_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         
@@ -479,7 +540,10 @@ const ProfilePage = () => {
                             <span>{post.userLiked ? '❤️' : '🤍'}</span>
                             <span className="text-sm">{post.likes_count || 0}</span>
                           </button>
-                          <button className="flex items-center space-x-1 text-gray-500 hover:text-blue-600 transition-colors">
+                          <button
+                            onClick={() => openPostDetail(post)}
+                            className="flex items-center space-x-1 text-gray-500 hover:text-blue-600 transition-colors"
+                          >
                             <span>💬</span>
                             <span className="text-sm">{post.comments_count || 0}</span>
                           </button>
@@ -515,7 +579,7 @@ const ProfilePage = () => {
           )}
           
           {/* Private Profile Message */}
-          {!isCurrentUser && !isFriend && (
+          {!isCurrentUser && !canMessage && (
             <div className="text-center py-8 text-gray-500">
               <p className="text-lg font-medium mb-2">Private Profile</p>
               <p className="text-sm">Send a friend request to see their posts.</p>

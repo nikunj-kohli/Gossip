@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const sharp = require('sharp');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -26,7 +26,7 @@ const storage = new CloudinaryStorage({
     folder: 'gossip',
     allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
     transformation: [{ quality: 'auto' }],
-    public_id: (req, file) => `${Date.now()}-${uuidv4()}`
+    public_id: (req, file) => `${Date.now()}-${randomUUID()}`
   }
 });
 
@@ -44,7 +44,7 @@ const localTempStorage = multer.diskStorage({
     cb(null, tempDir);
   },
   filename: (req, file, cb) => {
-    const uniqueFilename = `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
+    const uniqueFilename = `${Date.now()}-${randomUUID()}${path.extname(file.originalname)}`;
     cb(null, uniqueFilename);
   }
 });

@@ -12,16 +12,19 @@ import RegisterPage from './pages/RegisterPage';
 import FeedPage from './pages/FeedPage';
 import FriendsPage from './pages/FriendsPage';
 import MessagesPage from './pages/MessagesPage';
-import ProfilePage from './pages/ProfilePage';
 import CommunitiesPage from './pages/CommunitiesPage';
+import CommunityManagementPage from './pages/CommunityManagementPage';
+import CommunityDetailPage from './pages/CommunityDetailPage';
+import ProfilePage from './pages/ProfilePage';
 import CommonWall from './pages/CommonWall';
+import PostDetailPage from './pages/PostDetailPage';
 import './App.css';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen bg-gray-50">
+        <div className="app-shell">
           <Navbar />
           <Routes>
             {/* Public routes - redirect if authenticated */}
@@ -52,17 +55,44 @@ function App() {
                 <CommunitiesPage />
               </ProtectedRoute>
             } />
+            <Route path="/communities/:communityName" element={
+              <ProtectedRoute>
+                <CommunityDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/r/:communityName" element={
+              <ProtectedRoute>
+                <CommunityDetailPage />
+              </ProtectedRoute>
+            } />
+            {/* ID-based routes first (backward compatibility) */}
             <Route path="/community/:id" element={
               <ProtectedRoute>
                 <CommunitiesPage />
               </ProtectedRoute>
             } />
-            <Route path="/friends" element={
+            <Route path="/community/:id/manage" element={
               <ProtectedRoute>
-                <FriendsPage />
+                <CommunityManagementPage />
               </ProtectedRoute>
             } />
-            <Route path="/friends/:username" element={
+            {/* Name-based routes second */}
+            <Route path="/community/:communityName" element={
+              <ProtectedRoute>
+                <CommunitiesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/community/:communityName/manage" element={
+              <ProtectedRoute>
+                <CommunityManagementPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/r/:communityName/manage" element={
+              <ProtectedRoute>
+                <CommunityManagementPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/requests" element={
               <ProtectedRoute>
                 <FriendsPage />
               </ProtectedRoute>
@@ -72,12 +102,12 @@ function App() {
                 <CommonWall />
               </ProtectedRoute>
             } />
-            <Route path="/messages" element={
+            <Route path="/inbox" element={
               <ProtectedRoute>
                 <MessagesPage />
               </ProtectedRoute>
             } />
-            <Route path="/messages/:conversationId" element={
+            <Route path="/inbox/:conversationId" element={
               <ProtectedRoute>
                 <MessagesPage />
               </ProtectedRoute>
@@ -85,6 +115,21 @@ function App() {
             <Route path="/profile/:username" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/p/:headline/:dateAndToken" element={
+              <ProtectedRoute>
+                <PostDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/p/:legacyId" element={
+              <ProtectedRoute>
+                <PostDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/c/:communitySlug/:headline/:dateAndToken" element={
+              <ProtectedRoute>
+                <PostDetailPage />
               </ProtectedRoute>
             } />
           </Routes>

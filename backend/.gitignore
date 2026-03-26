@@ -26,6 +26,7 @@ yarn-error.log*
 # Database
 *.sqlite
 *.db
+db/
 
 # IDE and editors
 .idea/

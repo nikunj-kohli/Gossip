@@ -1,9 +1,11 @@
 const { logger } = require('./loggingService');
 const { Pool } = require('pg');
 const config = require('../config/config');
+const { URL } = require('url');
 
 // Threshold for slow queries in milliseconds
 const SLOW_QUERY_THRESHOLD = 200;
+const logAllQueries = process.env.LOG_ALL_QUERIES === 'true';
 
 // Create an instrumented pool
 class InstrumentedPool extends Pool {
@@ -35,12 +37,14 @@ class InstrumentedPool extends Pool {
       // Extract query name from comments if available
       const queryName = (text.match(/\/\*\s*([^*]+)\s*\*\//) || [])[1] || 'anonymous';
       
-      // Log all queries in debug
-      logger.debug('Database query executed', {
-        query: queryName,
-        duration,
-        rows: result ? result.rowCount : 0
-      });
+      // Avoid per-query log overhead unless explicitly enabled.
+      if (logAllQueries) {
+        logger.debug('Database query executed', {
+          query: queryName,
+          duration,
+          rows: result ? result.rowCount : 0
+        });
+      }
       
       // Log slow queries as warnings
       if (duration > SLOW_QUERY_THRESHOLD) {
@@ -98,17 +102,52 @@ class InstrumentedPool extends Pool {
 }
 
 // Create and export instrumented pool
-const pool = new InstrumentedPool({
-  host: config.database.host,
-  port: config.database.port,
-  database: config.database.name,
-  user: config.database.user,
-  password: config.database.password,
-  ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-  max: config.database.maxConnections,
-  idleTimeoutMillis: config.database.idleTimeoutMillis,
-  connectionTimeoutMillis: config.database.connectionTimeoutMillis
-});
+// Parse DATABASE_URL into components to ensure IPv4 is used
+const parseConnString = (connString) => {
+  if (!connString) return null;
+  try {
+    const parsed = new URL(connString);
+    if (!parsed.hostname) return null;
+
+    return {
+      user: decodeURIComponent(parsed.username || ''),
+      password: decodeURIComponent(parsed.password || ''),
+      host: parsed.hostname,
+      port: parseInt(parsed.port, 10) || 5432,
+      database: (parsed.pathname || '/').replace(/^\//, '') || 'postgres'
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
+const dbConfig = config.database.url ? parseConnString(config.database.url) : null;
+
+const poolConfig = dbConfig
+  ? {
+      host: dbConfig.host,
+      port: dbConfig.port,
+      database: dbConfig.database,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      ssl: { rejectUnauthorized: false },
+      max: config.database.maxConnections,
+      idleTimeoutMillis: config.database.idleTimeoutMillis,
+      connectionTimeoutMillis: config.database.connectionTimeoutMillis
+    }
+  : {
+      host: config.database.host,
+      port: config.database.port,
+      database: config.database.name,
+      user: config.database.user,
+      password: config.database.password,
+      ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+      max: config.database.maxConnections,
+      idleTimeoutMillis: config.database.idleTimeoutMillis,
+      connectionTimeoutMillis: config.database.connectionTimeoutMillis
+    };
+
+const pool = new InstrumentedPool(poolConfig);
 
 // Migration for query performance logs table
 const createQueryLogsTable = async () => {

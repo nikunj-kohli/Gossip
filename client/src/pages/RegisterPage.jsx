@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 const RegisterPage = () => {
@@ -80,8 +81,8 @@ const RegisterPage = () => {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
+      // Redirect to primary authenticated route
+      window.location.href = '/feed';
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -111,7 +112,7 @@ const RegisterPage = () => {
                   name="username"
                   type="text"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[#E4572E] focus:border-[#E4572E] sm:text-sm"
                   placeholder="Choose a username"
                   value={formData.username}
                   onChange={handleChange}
@@ -131,7 +132,7 @@ const RegisterPage = () => {
                   type="email"
                   autoComplete="email"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[#E4572E] focus:border-[#E4572E] sm:text-sm"
                   placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleChange}
@@ -142,7 +143,7 @@ const RegisterPage = () => {
             <button
               type="button"
               onClick={handleNext}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-semibold rounded-md text-white bg-[#E4572E] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#E4572E]"
             >
               Next
             </button>
@@ -169,7 +170,7 @@ const RegisterPage = () => {
                   name="password"
                   type="password"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[#E4572E] focus:border-[#E4572E] sm:text-sm"
                   placeholder="Create a password"
                   value={formData.password}
                   onChange={handleChange}
@@ -188,7 +189,7 @@ const RegisterPage = () => {
                   name="confirmPassword"
                   type="password"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[#E4572E] focus:border-[#E4572E] sm:text-sm"
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
@@ -203,7 +204,7 @@ const RegisterPage = () => {
                   id="displayName"
                   name="displayName"
                   type="text"
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[#E4572E] focus:border-[#E4572E] sm:text-sm"
                   placeholder="How should we call you?"
                   value={formData.displayName}
                   onChange={handleChange}
@@ -218,14 +219,14 @@ const RegisterPage = () => {
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex-1 relative justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="flex-1 relative justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#E4572E]"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 relative justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="flex-1 relative justify-center py-2 px-4 border border-transparent text-sm font-semibold rounded-md text-white bg-[#E4572E] hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#E4572E] disabled:opacity-50"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
@@ -243,10 +244,10 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full editorial-card p-6 sm:p-8 space-y-6">
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -257,8 +258,8 @@ const RegisterPage = () => {
               {[1, 2].map((s) => (
                 <div
                   key={s}
-                  className={`h-2 w-2 rounded-full mx-1 ${
-                    s <= step ? 'bg-indigo-600' : 'bg-gray-300'
+                  className={`h-2 w-2 rounded-full mx-1 transition ${
+                    s <= step ? 'bg-[#E4572E]' : 'bg-gray-300'
                   }`}
                 />
               ))}
@@ -270,9 +271,9 @@ const RegisterPage = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <Link to="/login" className="font-semibold text-[#E4572E] hover:brightness-90">
                 Sign in
-              </a>
+              </Link>
             </p>
           </div>
         </form>

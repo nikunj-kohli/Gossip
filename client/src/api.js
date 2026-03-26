@@ -1,7 +1,6 @@
-import { supabase } from './lib/supabaseClient'
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with auth
 const api = axios.create({
@@ -24,7 +23,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    if (error.response && error.response.status === 401) {
       // Token might be expired or invalid
       console.error('🚪', error.response.status, '- Token expired or invalid');
       console.log('🧹 Clearing localStorage and redirecting...');
@@ -40,12 +39,14 @@ api.interceptors.response.use(
 );
 
 // Posts (using backend API)
-export const getPosts = async () => {
+export const getPosts = async ({ mode = 'hybrid', limit = 20, offset = 0 } = {}) => {
   try {
     const token = localStorage.getItem('token');
     console.log('Current auth token:', token ? 'exists' : 'none'); // Debug auth state
     
-    const response = await api.get('/posts');
+    const response = await api.get('/posts', {
+      params: { mode, limit, offset },
+    });
     console.log('Raw API response:', response.data); // Debug raw response
     
     // Handle different response structures
@@ -70,14 +71,56 @@ export const getPosts = async () => {
   }
 };
 
-export const checkFriendshipStatus = async (username) => {
+export const getDiscoverPosts = async ({ limit = 20, offset = 0 } = {}) => {
   try {
-    console.log('Checking friendship status with:', username);
-    const response = await api.get(`/friends/status/${username}`);
-    console.log('Friendship status response:', response.data);
+    const response = await api.get('/posts/discover', {
+      params: { limit, offset },
+    });
+
+    const rows = Array.isArray(response?.data?.posts) ? response.data.posts : [];
+    return { data: rows, error: null };
+  } catch (error) {
+    console.error('Error fetching discover posts:', error);
+    return { data: [], error };
+  }
+};
+
+export const getFeedPreferences = async () => {
+  try {
+    const response = await api.get('/posts/preferences/feed');
+    return { data: response.data?.preferences || null, error: null };
+  } catch (error) {
+    console.error('Error fetching feed preferences:', error);
+    return { data: null, error };
+  }
+};
+
+export const updateFeedPreferences = async (preferences) => {
+  try {
+    const response = await api.put('/posts/preferences/feed', preferences);
+    return { data: response.data?.preferences || null, error: null };
+  } catch (error) {
+    console.error('Error updating feed preferences:', error);
+    return { data: null, error };
+  }
+};
+
+export const markPostNotInterested = async (postId) => {
+  try {
+    const response = await api.post(`/posts/${postId}/not-interested`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error checking friendship status:', error);
+    console.error('Error marking post as not interested:', error);
+    return { data: null, error };
+  }
+};
+
+export const checkMessagingAccessStatus = async (username) => {
+  try {
+    const response = await api.get(`/requests/status/${username}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error checking messaging access status:', error);
     return { data: null, error };
   }
 };
@@ -135,6 +178,71 @@ export const toggleLike = async (postId) => {
   }
 };
 
+export const sharePost = async (postId) => {
+  try {
+    const response = await api.post(`/posts/${postId}/share`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error sharing post:', error);
+    return { data: null, error };
+  }
+};
+
+export const getPostComments = async (postId, { limit = 20, offset = 0 } = {}) => {
+  try {
+    const response = await api.get(`/posts/${postId}/comments`, {
+      params: { limit, offset },
+    });
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching post comments:', error);
+    return { data: null, error };
+  }
+};
+
+export const addPostComment = async (postId, payload) => {
+  try {
+    const response = await api.post(`/posts/${postId}/comments`, payload);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error adding post comment:', error);
+    return { data: null, error };
+  }
+};
+
+export const toggleCommentLike = async (postId, commentId) => {
+  try {
+    const response = await api.post(`/posts/${postId}/comments/${commentId}/like`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error toggling comment like:', error);
+    return { data: null, error };
+  }
+};
+
+export const getPostByPermalink = async ({ communitySlug, headline, dateAndToken }) => {
+  try {
+    const path = communitySlug
+      ? `/posts/c/${communitySlug}/${headline}/${dateAndToken}`
+      : `/posts/p/${headline}/${dateAndToken}`;
+    const response = await api.get(path);
+    return { data: response.data?.post || null, error: null };
+  } catch (error) {
+    console.error('Error fetching post by permalink:', error);
+    return { data: null, error };
+  }
+};
+
+export const getPostById = async (postId) => {
+  try {
+    const response = await api.get(`/posts/${postId}`);
+    return { data: response.data?.post || null, error: null };
+  } catch (error) {
+    console.error('Error fetching post by id:', error);
+    return { data: null, error };
+  }
+};
+
 // Communities/Groups (using backend API)
 export const getCommunities = async () => {
   try {
@@ -142,6 +250,26 @@ export const getCommunities = async () => {
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching communities:', error);
+    return { data: null, error };
+  }
+};
+
+export const getCommunityById = async (communityId) => {
+  try {
+    const response = await api.get(`/groups/${communityId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching community:', error);
+    return { data: null, error };
+  }
+};
+
+export const getCommunityByName = async (communityName) => {
+  try {
+    const response = await api.get(`/groups/name/${communityName}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching community by name:', error);
     return { data: null, error };
   }
 };
@@ -156,12 +284,28 @@ export const createCommunity = async (communityData) => {
   }
 };
 
+export const updateGroup = async (communityId, communityData) => {
+  try {
+    const response = await api.put(`/groups/${communityId}`, communityData);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error updating community:', error);
+    return { data: null, error };
+  }
+};
+
 export const joinCommunity = async (communityId) => {
   try {
     const response = await api.post(`/groups/${communityId}/join`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error joining community:', error);
+    const isAlreadyMemberError = error.response?.status === 400
+      && /already a member/i.test(error.response?.data?.message || '');
+
+    if (!isAlreadyMemberError) {
+      console.error('Error joining community:', error);
+    }
+
     return { data: null, error };
   }
 };
@@ -176,6 +320,16 @@ export const leaveCommunity = async (communityId) => {
   }
 };
 
+export const deleteGroup = async (communityId) => {
+  try {
+    const response = await api.delete(`/groups/${communityId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error deleting community:', error);
+    return { data: null, error };
+  }
+};
+
 export const getCommunityMembers = async (communityId) => {
   try {
     const response = await api.get(`/groups/${communityId}/members`);
@@ -186,90 +340,140 @@ export const getCommunityMembers = async (communityId) => {
   }
 };
 
-// Friends (using backend API)
-export const getFriends = async ({ signal } = {}) => {
+export const getUserMemberships = async () => {
   try {
-    const response = await api.get('/friends/friends', { signal });
+    const response = await api.get('/groups/user/member');
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching user memberships:', error);
+    return { data: null, error };
+  }
+};
+
+export const getGroupPosts = async (groupId, { limit = 20, offset = 0 } = {}) => {
+  try {
+    const response = await api.get(`/posts/groups/${groupId}/posts`, {
+      params: { limit, offset },
+    });
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching group posts:', error);
+    return { data: null, error };
+  }
+};
+
+export const createGroupPost = async (groupId, postData) => {
+  try {
+    const response = await api.post(`/posts/groups/${groupId}/posts`, postData);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error creating group post:', error);
+    return { data: null, error };
+  }
+};
+
+export const warnCommunityPost = async (postId, reason) => {
+  try {
+    const response = await api.post(`/posts/${postId}/warn`, { reason });
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error warning community post:', error);
+    return { data: null, error };
+  }
+};
+
+// Requests and connections (backend API)
+export const getConnections = async ({ signal } = {}) => {
+  try {
+    const response = await api.get('/requests/connections', { signal });
     return { data: response.data, error: null };
   } catch (error) {
     if (error.name === 'CanceledError') {
-      console.log('getFriends request canceled');
+      console.log('getConnections request canceled');
       throw error;
     }
-    console.error('Error fetching friends:', error);
+    console.error('Error fetching connections:', error);
     return { data: [], error };
   }
 };
 
-export const getPendingRequests = async () => {
+export const getIncomingMessageRequests = async () => {
   try {
-    const response = await api.get('/friends/requests');
+    const response = await api.get('/requests/incoming');
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error fetching friend requests:', error);
+    console.error('Error fetching incoming requests:', error);
     return { data: null, error };
   }
 };
 
-export const getSentRequests = async () => {
+export const getOutgoingMessageRequests = async () => {
   try {
-    const response = await api.get('/friends/sent');
+    const response = await api.get('/requests/outgoing');
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error fetching sent requests:', error);
+    console.error('Error fetching outgoing requests:', error);
     return { data: null, error };
   }
 };
 
-export const sendFriendRequest = async (friendId) => {
+export const sendMessageRequest = async (userId) => {
   try {
-    // Validate friendId
-    if (!friendId || isNaN(parseInt(friendId))) {
+    if (!userId || isNaN(parseInt(userId, 10))) {
       return { data: null, error: { message: 'Invalid user ID' } };
     }
-    
-    console.log('Sending friend request to user ID:', friendId);
-    const response = await api.post(`/friends/users/${friendId}/request`);
+
+    const response = await api.post(`/requests/users/${userId}/request`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error sending friend request:', error.response?.data || error.message);
+    console.error('Error sending message request:', error.response?.data || error.message);
     return { data: null, error: error.response?.data || error };
   }
 };
 
-export const acceptFriendRequest = async (userId) => {
+export const acceptMessageRequest = async (userId) => {
   try {
-    const response = await api.post(`/friends/users/${userId}/accept`);
+    const response = await api.post(`/requests/users/${userId}/accept`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error accepting friend request:', error);
+    console.error('Error accepting message request:', error);
     return { data: null, error };
   }
 };
 
-export const declineFriendRequest = async (userId) => {
+export const declineMessageRequest = async (userId) => {
   try {
-    const response = await api.post(`/friends/users/${userId}/decline`);
+    const response = await api.post(`/requests/users/${userId}/decline`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error declining friend request:', error);
+    console.error('Error declining message request:', error);
     return { data: null, error };
   }
 };
 
-export const removeFriend = async (userId) => {
+export const cancelMessageRequest = async (userId) => {
   try {
-    const response = await api.post(`/friends/users/${userId}/remove`);
+    const response = await api.post(`/requests/users/${userId}/cancel`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error removing friend:', error);
+    console.error('Error cancelling message request:', error);
+    return { data: null, error };
+  }
+};
+
+export const removeConnection = async (userId) => {
+  try {
+    const response = await api.post(`/requests/users/${userId}/remove`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error removing connection:', error);
     return { data: null, error };
   }
 };
 
 export const getMutualFriends = async (userId) => {
   try {
-    const response = await api.get(`/friends/users/${userId}/mutual`);
+    const response = await api.get(`/requests/users/${userId}/mutual`);
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching mutual friends:', error);
@@ -277,14 +481,14 @@ export const getMutualFriends = async (userId) => {
   }
 };
 
-// Messages (using backend API)
-export const getConversations = async ({ signal } = {}) => {
+// Inbox (using backend API)
+export const getInboxConversations = async ({ signal } = {}) => {
   try {
-    const response = await api.get('/conversations', { signal });
+    const response = await api.get('/inbox', { signal });
     return { data: response.data, error: null };
   } catch (error) {
     if (error.name === 'CanceledError') {
-      console.log('getConversations request canceled');
+      console.log('getInboxConversations request canceled');
       throw error;
     }
     console.error('Error fetching conversations:', error);
@@ -292,9 +496,9 @@ export const getConversations = async ({ signal } = {}) => {
   }
 };
 
-export const getConversation = async (conversationId) => {
+export const getInboxConversation = async (conversationId) => {
   try {
-    const response = await api.get(`/conversations/${conversationId}`);
+    const response = await api.get(`/inbox/${conversationId}`);
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching conversation:', error);
@@ -302,9 +506,11 @@ export const getConversation = async (conversationId) => {
   }
 };
 
-export const getMessages = async (conversationId) => {
+export const getInboxMessages = async (conversationId, { limit = 100, offset = 0 } = {}) => {
   try {
-    const response = await api.get(`/conversations/${conversationId}/messages`);
+    const response = await api.get(`/inbox/${conversationId}/messages`, {
+      params: { limit, offset },
+    });
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -312,9 +518,9 @@ export const getMessages = async (conversationId) => {
   }
 };
 
-export const sendMessage = async (conversationId, messageData) => {
+export const sendInboxMessage = async (conversationId, messageData) => {
   try {
-    const response = await api.post(`/conversations/${conversationId}/messages`, messageData);
+    const response = await api.post(`/inbox/${conversationId}/messages`, messageData);
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error sending message:', error);
@@ -322,28 +528,19 @@ export const sendMessage = async (conversationId, messageData) => {
   }
 };
 
-export const startConversation = async (userId) => {
+export const startInboxConversation = async (userId) => {
   try {
-    const token = localStorage.getItem('token');
-    console.log('=== START CONVERSATION DEBUG ===');
-    console.log('Token in localStorage:', token ? 'exists' : 'missing');
-    console.log('UserId:', userId);
-    console.log('Making request to:', `/conversations/users/${userId}`);
-    
-    const response = await api.post(`/conversations/users/${userId}`);
-    console.log('Conversation response:', response.data);
+    const response = await api.post(`/inbox/users/${userId}`);
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error starting conversation:', error);
-    console.error('Error response:', error.response?.data);
-    console.error('Error status:', error.response?.status);
     return { data: null, error };
   }
 };
 
-export const markMessagesAsRead = async (conversationId) => {
+export const markInboxMessagesAsRead = async (conversationId) => {
   try {
-    const response = await api.put(`/conversations/${conversationId}/read`);
+    const response = await api.put(`/inbox/${conversationId}/read`);
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error marking messages as read:', error);
@@ -351,12 +548,60 @@ export const markMessagesAsRead = async (conversationId) => {
   }
 };
 
-export const getUnreadCount = async () => {
+export const deleteInboxMessage = async (messageId) => {
   try {
-    const response = await api.get('/conversations/unread');
+    const response = await api.delete(`/inbox/messages/${messageId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error deleting inbox message:', error);
+    return { data: null, error };
+  }
+};
+
+export const getInboxUnreadCount = async () => {
+  try {
+    const response = await api.get('/inbox/unread');
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching unread count:', error);
+    return { data: null, error };
+  }
+};
+
+export const uploadInboxAttachment = async (file, userId) => {
+  try {
+    const formData = new FormData();
+    formData.append('media', file);
+    formData.append('type', file.type && file.type.startsWith('video/') ? 'video' : 'image');
+
+    const response = await api.post('/media', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    const media = response?.data?.media || response?.data?.data || response?.data || {};
+    const resolvedUrl = media.url || media.secure_url || media?.variants?.original || '';
+
+    if (!resolvedUrl || !/^https?:\/\//i.test(resolvedUrl)) {
+      return {
+        data: null,
+        error: new Error('Upload succeeded but no valid public file URL was returned.'),
+      };
+    }
+
+    return {
+      data: {
+        url: resolvedUrl,
+        path: media.public_id || media.publicId || resolvedUrl,
+        name: file.name,
+        size: media.size || file.size,
+        mimeType: media.metadata?.mimeType || file.type || 'application/octet-stream',
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error('Error uploading inbox attachment:', error);
     return { data: null, error };
   }
 };
@@ -376,7 +621,10 @@ export const searchUsers = async (query) => {
 export const getUserPosts = async (userId) => {
   try {
     const response = await api.get(`/posts/user/${userId}`);
-    return { data: response.data, error: null };
+    const rows = Array.isArray(response?.data)
+      ? response.data
+      : (Array.isArray(response?.data?.posts) ? response.data.posts : []);
+    return { data: rows, error: null };
   } catch (error) {
     console.error('Error fetching user posts:', error);
     return { data: null, error };

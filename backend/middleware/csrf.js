@@ -42,16 +42,21 @@ const provideCsrfToken = (req, res, next) => {
 
 // API routes should be excluded from CSRF protection
 const shouldProtectRoute = (req) => {
+  // Health and readiness probes must stay unprotected for infra checks.
+  if (req.path === '/health' || req.path === '/ready') {
+    return false;
+  }
+
   // Skip CSRF for API routes
   if (req.path.startsWith('/api/')) {
     return false;
   }
-  
+
   // Skip CSRF for authentication endpoints
   if (req.path.startsWith('/auth/')) {
     return false;
   }
-  
+
   // Protect all other routes
   return true;
 };

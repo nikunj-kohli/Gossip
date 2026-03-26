@@ -141,23 +141,23 @@ const DashboardPage = () => {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-background-dark">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-[#f6f4ef]">
       {/* Sidebar / Inbox List */}
-      <aside className="w-80 flex-shrink-0 border-r border-sage-200 dark:border-sage-500/20 bg-white dark:bg-background-dark flex flex-col">
-        <div className="p-6 border-b border-sage-100 dark:border-sage-500/10">
+      <aside className="w-80 flex-shrink-0 border-r border-[#d8d2c6] bg-[#fffdf8] hidden md:flex flex-col">
+        <div className="p-6 border-b border-[#ece6da]">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-3xl">filter_vintage</span>
-              <h1 className="text-xl font-semibold tracking-tight">Whisper</h1>
+              <span className="material-symbols-outlined text-[#E4572E] text-3xl">forum</span>
+              <h1 className="text-xl font-semibold tracking-tight text-[#1D232E]">Gossip Inbox</h1>
             </div>
-            <button className="p-2 rounded-full bg-sage-50 hover:bg-sage-100 transition-colors">
-              <span className="material-symbols-outlined text-sage-500">edit_square</span>
+            <button className="p-2 rounded-full bg-[#f7f2e9] hover:bg-[#eee6d7] transition-colors">
+              <span className="material-symbols-outlined text-[#5B6472]">edit_square</span>
             </button>
           </div>
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-xl">search</span>
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8d97a6] text-xl">search</span>
             <input 
-              className="w-full bg-sage-50 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/30 placeholder:text-sage-400" 
+              className="w-full bg-[#f7f2e9] border-none rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-[#E4572E]/40 placeholder:text-[#8d97a6]" 
               placeholder="Search conversations..." 
               type="text"
               value={searchQuery}
@@ -175,16 +175,16 @@ const DashboardPage = () => {
                 setMessages(sampleMessages);
               }}
               className={`px-4 mb-1 cursor-pointer ${
-                activeChat?.id === conversation.id ? '' : 'hover:bg-sage-50 transition-colors'
+                activeChat?.id === conversation.id ? '' : 'hover:bg-[#f7f2e9] transition-colors'
               }`}
             >
               <div className={`flex items-center gap-4 p-3 rounded-xl ${
                 activeChat?.id === conversation.id 
-                  ? 'bg-primary/10 border border-primary/5' 
+                  ? 'bg-[#ffede8] border border-[#f1c9be]' 
                   : ''
               }`}>
                 <div className="relative">
-                  <div className="size-12 rounded-full bg-sage-200 overflow-hidden">
+                  <div className="size-12 rounded-full bg-[#efe7db] overflow-hidden">
                     <img 
                       src={conversation.avatar} 
                       alt={conversation.name}
@@ -197,14 +197,14 @@ const DashboardPage = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
-                    <h3 className="font-medium text-sm truncate">{conversation.name}</h3>
+                    <h3 className="font-medium text-sm truncate text-[#1D232E]">{conversation.name}</h3>
                     <span className={`text-[10px] font-semibold uppercase ${
-                      conversation.time === 'Now' ? 'text-primary' : 'text-slate-400'
+                      conversation.time === 'Now' ? 'text-[#E4572E]' : 'text-[#8d97a6]'
                     }`}>
                       {conversation.time}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">{conversation.lastMessage}</p>
+                  <p className="text-xs text-[#8d97a6] truncate mt-0.5">{conversation.lastMessage}</p>
                 </div>
               </div>
             </div>
@@ -213,13 +213,34 @@ const DashboardPage = () => {
       </aside>
 
       {/* Chat Area */}
-      <main className="flex-1 flex flex-col bg-white dark:bg-background-dark relative">
+      <main className="flex-1 flex flex-col bg-[#fffdf8] relative">
         {activeChat ? (
           <>
+            <div className="md:hidden px-4 py-3 border-b border-[#ece6da] overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 min-w-max">
+                {filteredConversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    onClick={() => {
+                      setActiveChat(conversation);
+                      setMessages(sampleMessages);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                      activeChat?.id === conversation.id
+                        ? 'bg-[#ffede8] text-[#1D232E] border border-[#f1c9be]'
+                        : 'bg-[#f7f2e9] text-[#5B6472]'
+                    }`}
+                  >
+                    {conversation.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Chat Header */}
-            <header className="h-20 border-b border-sage-100 dark:border-sage-500/10 flex items-center justify-between px-8">
+            <header className="h-20 border-b border-[#ece6da] flex items-center justify-between px-4 md:px-8">
               <div className="flex items-center gap-4">
-                <div className="size-10 rounded-full bg-sage-100 overflow-hidden">
+                <div className="size-10 rounded-full bg-[#f1e9dc] overflow-hidden">
                   <img 
                     src={activeChat.avatar} 
                     alt={activeChat.name}
@@ -227,29 +248,29 @@ const DashboardPage = () => {
                   />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-base">{activeChat.name}</h2>
-                  <p className="text-xs text-primary font-medium">
+                  <h2 className="font-semibold text-base text-[#1D232E]">{activeChat.name}</h2>
+                  <p className="text-xs text-[#E4572E] font-medium">
                     {activeChat.online ? 'Online now' : 'Offline'}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button className="p-2 text-sage-400 hover:text-primary transition-colors">
+                <button className="p-2 text-[#8d97a6] hover:text-[#E4572E] transition-colors">
                   <span className="material-symbols-outlined">call</span>
                 </button>
-                <button className="p-2 text-sage-400 hover:text-primary transition-colors">
+                <button className="p-2 text-[#8d97a6] hover:text-[#E4572E] transition-colors">
                   <span className="material-symbols-outlined">videocam</span>
                 </button>
-                <button className="p-2 text-sage-400 hover:text-primary transition-colors">
+                <button className="p-2 text-[#8d97a6] hover:text-[#E4572E] transition-colors">
                   <span className="material-symbols-outlined">more_vert</span>
                 </button>
               </div>
             </header>
 
             {/* Messages Flow */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
               <div className="flex justify-center">
-                <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest bg-sage-50 px-3 py-1 rounded-full">Today</span>
+                <span className="text-[10px] font-medium text-[#8d97a6] uppercase tracking-widest bg-[#f7f2e9] px-3 py-1 rounded-full">Today</span>
               </div>
               
               {messages.map(message => (
@@ -272,8 +293,8 @@ const DashboardPage = () => {
                   <div className={`space-y-1 ${message.type === 'sent' ? 'items-end flex flex-col' : ''}`}>
                     <div className={`${
                       message.type === 'sent' 
-                        ? 'bg-primary text-white px-5 py-3 rounded-2xl rounded-tr-none shadow-md shadow-primary/10'
-                        : 'bg-sage-50 text-slate-700 px-5 py-3 rounded-2xl rounded-tl-none shadow-sm'
+                        ? 'bg-[#E4572E] text-white px-5 py-3 rounded-2xl rounded-tr-none shadow-md'
+                        : 'bg-[#f7f2e9] text-[#1D232E] px-5 py-3 rounded-2xl rounded-tl-none shadow-sm'
                     }`}>
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     </div>
@@ -290,7 +311,7 @@ const DashboardPage = () => {
                       </div>
                     )}
                     
-                    <span className="text-[10px] text-slate-400 px-1">{message.time}</span>
+                    <span className="text-[10px] text-[#8d97a6] px-1">{message.time}</span>
                   </div>
                 </div>
               ))}
@@ -299,25 +320,25 @@ const DashboardPage = () => {
             </div>
 
             {/* Chat Input */}
-            <div className="p-6">
-              <div className="bg-sage-50 rounded-2xl p-2 flex items-center gap-2">
-                <button className="p-2 text-sage-400 hover:text-primary transition-colors">
+            <div className="p-4 md:p-6">
+              <div className="bg-[#f7f2e9] rounded-2xl p-2 flex items-center gap-2">
+                <button className="p-2 text-[#8d97a6] hover:text-[#E4572E] transition-colors">
                   <span className="material-symbols-outlined">add_circle</span>
                 </button>
                 <input 
-                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 placeholder:text-sage-400" 
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 placeholder:text-[#8d97a6]" 
                   placeholder="Whisper something..." 
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 />
-                <button className="p-2 text-sage-400 hover:text-primary transition-colors">
+                <button className="p-2 text-[#8d97a6] hover:text-[#E4572E] transition-colors">
                   <span className="material-symbols-outlined">mood</span>
                 </button>
                 <button 
                   onClick={handleSendMessage}
-                  className="bg-primary text-white size-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20"
+                  className="bg-[#E4572E] text-white size-10 rounded-xl flex items-center justify-center shadow-lg"
                 >
                   <span className="material-symbols-outlined">send</span>
                 </button>
@@ -327,8 +348,8 @@ const DashboardPage = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <span className="material-symbols-outlined text-6xl text-sage-300 mb-4">chat_bubble</span>
-              <p className="text-slate-500">Select a conversation to start messaging</p>
+              <span className="material-symbols-outlined text-6xl text-[#c0b9ac] mb-4">chat_bubble</span>
+              <p className="text-[#5B6472]">Select a conversation to start messaging</p>
             </div>
           </div>
         )}
@@ -336,9 +357,9 @@ const DashboardPage = () => {
 
       {/* Details Sidebar */}
       {activeChat && (
-        <aside className="w-72 flex-shrink-0 border-l border-sage-100 dark:border-sage-500/10 bg-white dark:bg-background-dark overflow-y-auto hidden xl:flex flex-col">
+        <aside className="w-72 flex-shrink-0 border-l border-[#ece6da] bg-[#fffdf8] overflow-y-auto hidden xl:flex flex-col">
           <div className="p-8 text-center flex flex-col items-center">
-            <div className="size-24 rounded-full bg-sage-50 p-1 mb-4">
+            <div className="size-24 rounded-full bg-[#f7f2e9] p-1 mb-4">
               <div className="size-full rounded-full overflow-hidden">
                 <img 
                   src={activeChat.avatar} 
@@ -348,15 +369,15 @@ const DashboardPage = () => {
               </div>
             </div>
             <h3 className="text-lg font-semibold">{activeChat.name}</h3>
-            <p className="text-xs text-slate-400 mt-1">Creative Director @ ZenStudio</p>
+            <p className="text-xs text-[#8d97a6] mt-1">Creative Director @ ZenStudio</p>
             <div className="flex gap-4 mt-6">
-              <button className="size-10 flex items-center justify-center rounded-full bg-sage-50 text-sage-500 hover:bg-sage-100 transition-colors">
+              <button className="size-10 flex items-center justify-center rounded-full bg-[#f7f2e9] text-[#5B6472] hover:bg-[#eee6d7] transition-colors">
                 <span className="material-symbols-outlined text-xl">person</span>
               </button>
-              <button className="size-10 flex items-center justify-center rounded-full bg-sage-50 text-sage-500 hover:bg-sage-100 transition-colors">
+              <button className="size-10 flex items-center justify-center rounded-full bg-[#f7f2e9] text-[#5B6472] hover:bg-[#eee6d7] transition-colors">
                 <span className="material-symbols-outlined text-xl">notifications_off</span>
               </button>
-              <button className="size-10 flex items-center justify-center rounded-full bg-sage-50 text-sage-500 hover:bg-sage-100 transition-colors">
+              <button className="size-10 flex items-center justify-center rounded-full bg-[#f7f2e9] text-[#5B6472] hover:bg-[#eee6d7] transition-colors">
                 <span className="material-symbols-outlined text-xl">block</span>
               </button>
             </div>
@@ -364,10 +385,10 @@ const DashboardPage = () => {
           
           <div className="px-6 py-4 space-y-6">
             <div>
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Shared Media</h4>
+              <h4 className="text-xs font-semibold text-[#8d97a6] uppercase tracking-widest mb-4">Shared Media</h4>
               <div className="grid grid-cols-3 gap-2">
                 {sharedMedia.map((media, index) => (
-                  <div key={index} className="aspect-square bg-sage-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
+                  <div key={index} className="aspect-square bg-[#f1e9dc] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
                     <img 
                       src={media} 
                       alt={`Shared image ${index + 1}`}
@@ -375,21 +396,21 @@ const DashboardPage = () => {
                     />
                   </div>
                 ))}
-                <div className="aspect-square bg-sage-50 rounded-lg flex items-center justify-center text-sage-400 text-xs font-medium cursor-pointer hover:bg-sage-100 transition-colors">
+                <div className="aspect-square bg-[#f7f2e9] rounded-lg flex items-center justify-center text-[#8d97a6] text-xs font-medium cursor-pointer hover:bg-[#eee6d7] transition-colors">
                   +12
                 </div>
               </div>
             </div>
             
             <div>
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Common Groups</h4>
+              <h4 className="text-xs font-semibold text-[#8d97a6] uppercase tracking-widest mb-4">Common Groups</h4>
               <div className="space-y-3">
                 {commonGroups.map((group, index) => (
                   <div key={index} className="flex items-center gap-3">
-                    <div className="size-8 rounded-lg bg-sage-100 flex items-center justify-center text-sage-500">
+                    <div className="size-8 rounded-lg bg-[#f1e9dc] flex items-center justify-center text-[#5B6472]">
                       <span className="material-symbols-outlined text-lg">{group.icon}</span>
                     </div>
-                    <span className="text-sm font-medium">{group.name}</span>
+                    <span className="text-sm font-medium text-[#1D232E]">{group.name}</span>
                   </div>
                 ))}
               </div>

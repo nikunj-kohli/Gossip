@@ -35,7 +35,19 @@ class Group {
             ];
 
             const result = await db.query(query, values);
-            return result.rows[0];
+            const createdGroup = result.rows[0];
+            
+            // Automatically add creator as admin member
+            const memberQuery = `
+                INSERT INTO group_members (group_id, user_id, role)
+                VALUES ($1, $2, 'admin')
+                RETURNING *
+            `;
+            
+            const memberResult = await db.query(memberQuery, [createdGroup.id, creatorId]);
+            createdGroup.membership = memberResult.rows[0];
+            
+            return createdGroup;
         } catch (error) {
             if (error.code === '23505' && error.constraint === 'groups_slug_key') {
                 throw new Error('A group with a similar name already exists');
@@ -66,6 +78,7 @@ class Group {
             // Prepare params array
             const params = [];
             let paramIndex = 1;
+            const userIdParamIndex = userId ? 1 : null;
 
             // Add membership status if userId is provided
             if (userId) {
@@ -105,7 +118,7 @@ class Group {
                     // For private groups, only show if user is a member
                     query += ` AND (g.privacy = 'public' OR (g.privacy = 'private' AND EXISTS(
                         SELECT 1 FROM group_members 
-                        WHERE group_id = g.id AND user_id = $${paramIndex} AND is_banned = FALSE
+                        WHERE group_id = g.id AND user_id = $${userIdParamIndex} AND is_banned = FALSE
                     )))`;
                 } else {
                     // Default to public if invalid privacy or no userId
@@ -118,7 +131,7 @@ class Group {
                 // With userId, show public and private groups user is a member of
                 query += ` AND (g.privacy = 'public' OR (g.privacy = 'private' AND EXISTS(
                     SELECT 1 FROM group_members 
-                    WHERE group_id = g.id AND user_id = $${paramIndex} AND is_banned = FALSE
+                    WHERE group_id = g.id AND user_id = $${userIdParamIndex} AND is_banned = FALSE
                 )))`;
             }
 
@@ -301,12 +314,53 @@ class Group {
         }
     }
 
+    // Get group by name/slug
+    static async getByName(name, { currentUserId = null } = {}) {
+        try {
+            let query = `
+                SELECT 
+                    g.*,
+                    u.display_name as creator_name,
+                    u.username as creator_username
+            `;
+            
+            // Add membership status if userId is provided
+            if (currentUserId) {
+                query += `,
+                    (SELECT EXISTS(
+                        SELECT 1 FROM group_members 
+                        WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
+                    )) as is_member,
+                    (SELECT role FROM group_members 
+                        WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
+                    ) as user_role
+                `;
+            } else {
+                query += `, false as is_member, null as user_role`;
+            }
+            
+            query += `
+                FROM groups g
+                LEFT JOIN users u ON g.creator_id = u.id
+                WHERE g.is_active = TRUE AND (g.name ILIKE $1 OR g.slug ILIKE $1)
+            `;
+            
+            const params = currentUserId ? [name, currentUserId] : [name];
+            const result = await db.query(query, params);
+            
+            return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
+
     // Get groups a user is a member of
     static async getByMember(memberId, { limit = 20, offset = 0, currentUserId = null } = {}) {
         try {
             let query = `
                 SELECT 
                     g.*,
+                    g.creator_id,
                     u.display_name as creator_name,
                     u.username as creator_username,
                     gm.role as user_role,
@@ -395,15 +449,21 @@ class Group {
     // Update group
     static async update(groupId, userId, { name, description, privacy, avatarUrl, coverUrl }) {
         try {
-            // Check if user has permission (must be admin)
+            // Check if user has permission (must be creator or admin)
             const permissionCheck = await db.query(`
                 SELECT EXISTS(
+                    SELECT 1 FROM groups
+                    WHERE id = $1 AND creator_id = $2
+                ) as is_creator,
+                EXISTS(
                     SELECT 1 FROM group_members
                     WHERE group_id = $1 AND user_id = $2 AND role = 'admin' AND is_banned = FALSE
-                ) as has_permission
+                ) as is_admin
             `, [groupId, userId]);
             
-            if (!permissionCheck.rows[0].has_permission) {
+            const { is_creator, is_admin } = permissionCheck.rows[0];
+            
+            if (!is_creator && !is_admin) {
                 throw new Error('Unauthorized to update this group');
             }
             
@@ -507,15 +567,21 @@ class Group {
     // Delete group (soft delete)
     static async delete(groupId, userId) {
         try {
-            // Check if user has permission (must be admin)
+            // Check if user has permission (must be creator or admin)
             const permissionCheck = await db.query(`
                 SELECT EXISTS(
+                    SELECT 1 FROM groups
+                    WHERE id = $1 AND creator_id = $2
+                ) as is_creator,
+                EXISTS(
                     SELECT 1 FROM group_members
                     WHERE group_id = $1 AND user_id = $2 AND role = 'admin' AND is_banned = FALSE
-                ) as has_permission
+                ) as is_admin
             `, [groupId, userId]);
             
-            if (!permissionCheck.rows[0].has_permission) {
+            const { is_creator, is_admin } = permissionCheck.rows[0];
+            
+            if (!is_creator && !is_admin) {
                 return { success: false, message: 'Unauthorized to delete this group' };
             }
             

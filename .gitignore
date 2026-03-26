@@ -1,0 +1,36 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+client/.env
+
+# Dependencies/build
+**/node_modules/
+**/dist/
+**/build/
+
+# Sensitive database artifacts
+backend/db/
+*.sql
+*_schema.sql
+*.dump
+*.bak
+
+# Temp/backup files
+*.tmp
+*.temp
+*.backup
+*.old

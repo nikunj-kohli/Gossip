@@ -6,6 +6,7 @@ const {
     getUserGroups,
     getUserMemberships,
     getGroupById,
+    getGroupByName,
     updateGroup,
     deleteGroup
 } = require('../controllers/groupController');
@@ -27,6 +28,9 @@ const {
 } = require('../controllers/groupMemberController');
 
 const router = express.Router();
+
+// Public route with optional auth so membership status can be computed
+router.get('/name/:name', optionalAuth, getGroupByName);
 
 // Public routes with optional auth
 router.get('/', optionalAuth, getAllGroups);

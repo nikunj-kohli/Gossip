@@ -1,29 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { getPosts, toggleLike, updatePost, deletePost, sendFriendRequest } from '../api';
+import { getPosts, getDiscoverPosts, getCommunities, getPostById, sharePost, toggleLike, updatePost, deletePost, sendMessageRequest } from '../api';
 
 const FeedPage = () => {
   const { user } = React.useContext(AuthContext);
+  const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
+  const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [feedMode, setFeedMode] = useState('hybrid');
   const [sortBy, setSortBy] = useState('hot');
   const [editingPost, setEditingPost] = useState(null);
   const [editContent, setEditContent] = useState('');
   const lastFetchTimeRef = useRef(0);
-
-  // Reddit-like categories
-  const categories = [
-    { id: 'all', name: 'All', icon: '🌍' },
-    { id: 'rants', name: 'Rants', icon: '😤' },
-    { id: 'memes', name: 'Memes', icon: '😂' },
-    { id: 'tech', name: 'Tech', icon: '💻' },
-    { id: 'relationships', name: 'Relationships', icon: '💕' },
-    { id: 'work', name: 'Work', icon: '💼' },
-    { id: 'school', name: 'School', icon: '🎓' },
-    { id: 'random', name: 'Random', icon: '🎲' }
-  ];
 
   const sortOptions = [
     { id: 'hot', name: '🔥 Hot' },
@@ -33,9 +23,27 @@ const FeedPage = () => {
   ];
 
   useEffect(() => {
-    console.log('FeedPage useEffect triggered:', { selectedCategory, sortBy });
+    console.log('FeedPage useEffect triggered:', { feedMode, sortBy });
     fetchPosts();
-  }, [selectedCategory, sortBy]);
+  }, [feedMode, sortBy]);
+
+  useEffect(() => {
+    const fetchCommunities = async () => {
+      const { data, error } = await getCommunities();
+      if (error) {
+        setCommunities([]);
+        return;
+      }
+
+      const rows = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.groups) ? data.groups : []);
+
+      setCommunities(rows);
+    };
+
+    fetchCommunities();
+  }, []);
 
   const fetchPosts = async () => {
     // Prevent rapid-fire calls (minimum 2 seconds between calls)
@@ -48,7 +56,11 @@ const FeedPage = () => {
     try {
       lastFetchTimeRef.current = now;
       setLoading(true);
-      const { data, error } = await getPosts();
+      const response = feedMode === 'discover'
+        ? await getDiscoverPosts({ limit: 20, offset: 0 })
+        : await getPosts({ mode: feedMode, limit: 20, offset: 0 });
+
+      const { data, error } = response;
       
       if (error) throw error;
       
@@ -64,8 +76,10 @@ const FeedPage = () => {
       // TODO: Add category filtering when backend supports it
       // For now, don't filter by category since backend doesn't return category field
       
-      // Sort posts
-      filteredPosts = sortPosts(filteredPosts, sortBy);
+      // Keep backend order for default feed to preserve random community sampling.
+      if (sortBy !== 'hot') {
+        filteredPosts = sortPosts(filteredPosts, sortBy);
+      }
       
       console.log('Posts after sorting:', filteredPosts.length); // Debug final count
       
@@ -178,42 +192,105 @@ const FeedPage = () => {
     }
   };
 
-  const handleSendFriendRequest = async (username) => {
+  const handleSendMessageRequest = async (userId) => {
     try {
-      // First, we need to get the user ID from username
-      // For now, let's show a simple alert
-      alert(`Friend request feature coming soon for ${username}!`);
-      
-      // TODO: Implement actual friend request
-      // const { data, error } = await sendFriendRequest(userId);
-      // if (error) {
-      //   console.error('Error sending friend request:', error);
-      //   alert('Failed to send friend request. Please try again.');
-      // } else {
-      //   alert('Friend request sent successfully!');
-      // }
+      if (!userId) {
+        alert('User not available for request');
+        return;
+      }
+
+      const { error } = await sendMessageRequest(userId);
+      if (error) {
+        alert(error.response?.data?.message || 'Failed to send request');
+        return;
+      }
+
+      alert('Message request sent');
     } catch (error) {
-      console.error('Error sending friend request:', error);
-      alert('Failed to send friend request. Please try again.');
+      console.error('Error sending message request:', error);
+      alert('Failed to send request. Please try again.');
     }
   };
 
-  const handleComment = async (postId) => {
+  const slugifyText = (text = 'post') =>
+    String(text)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60) || 'post';
+
+  const formatDateToken = (value) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+    return `${dd}${mm}${yyyy}`;
+  };
+
+  const encodePostToken = (postId, createdAt) => {
+    const ts = new Date(createdAt).getTime();
+    if (!postId || Number.isNaN(ts)) return null;
+    return btoa(`${postId}:${ts}`)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  };
+
+  const buildPermalinkFromPost = (post) => {
+    if (!post?.id || !post?.created_at) return null;
+    const headline = slugifyText(post.content || 'post');
+    const dateToken = formatDateToken(post.created_at);
+    const token = encodePostToken(post.id, post.created_at);
+    if (!dateToken || !token) return null;
+
+    if (post.group_slug || post.group_name || post.group_id) {
+      const communitySegment = post.group_slug || slugifyText(post.group_name || 'community') || String(post.group_id);
+      return `/c/${communitySegment}/${headline}/${dateToken}-${token}`;
+    }
+
+    return `/p/${headline}/${dateToken}-${token}`;
+  };
+
+  const handleComment = async (post) => {
     try {
-      // For now, let's show a simple alert
-      alert('Comment feature coming soon! 📝');
-      
-      // TODO: Implement comment modal/navigate to post detail
-      // Could navigate to `/post/${postId}` or open a modal
+      if (post?.permalink) {
+        navigate(`${post.permalink}#comments`);
+        return;
+      }
+
+      const localPermalink = buildPermalinkFromPost(post);
+      if (localPermalink) {
+        navigate(`${localPermalink}#comments`);
+        return;
+      }
+
+      if (!post?.id) return;
+      const { data, error } = await getPostById(post.id);
+      if (error || !data?.permalink) {
+        alert('Unable to open this post right now.');
+        return;
+      }
+
+      navigate(`${data.permalink}#comments`);
     } catch (error) {
-      console.error('Error opening comments:', error);
+      console.error('Error opening post detail:', error);
+      alert('Unable to open this post right now.');
     }
   };
 
   const handleShare = async (postId) => {
     try {
-      // Get the post URL
-      const postUrl = `${window.location.origin}/post/${postId}`;
+      const { data, error } = await sharePost(postId);
+      if (error || !data?.permalink) {
+        alert(error?.response?.data?.message || 'Failed to share post.');
+        return;
+      }
+
+      const postUrl = `${window.location.origin}${data.permalink}`;
       
       // Try to use Web Share API if available
       if (navigator.share) {
@@ -249,9 +326,13 @@ const FeedPage = () => {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
-  const getCategoryInfo = (categoryId) => {
-    return categories.find(cat => cat.id === categoryId) || categories[6]; // default to random
-  };
+  const suggestedCommunities = [...communities]
+    .sort((a, b) => {
+      const aCount = Number(a?.member_count ?? a?.members_count ?? a?.members ?? 0);
+      const bCount = Number(b?.member_count ?? b?.members_count ?? b?.members ?? 0);
+      return bCount - aCount;
+    })
+    .slice(0, 6);
 
   if (loading) {
     return (
@@ -269,22 +350,35 @@ const FeedPage = () => {
           <div className="lg:col-span-3">
             {/* Category and Sort Controls */}
             <div className="bg-white rounded-lg shadow-sm border p-3 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => setFeedMode('hybrid')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'hybrid' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  Hybrid
+                </button>
+                <button
+                  onClick={() => setFeedMode('pulse')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'pulse' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  Pulse
+                </button>
+                <button
+                  onClick={() => setFeedMode('tribes')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'tribes' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  Tribes
+                </button>
+                <button
+                  onClick={() => setFeedMode('discover')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'discover' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  Discover
+                </button>
+              </div>
+
               <div className="flex items-center justify-between">
-                <div className="flex space-x-2">
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                        selectedCategory === cat.id
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {cat.icon} {cat.name}
-                    </button>
-                  ))}
-                </div>
+                <div className="text-sm text-gray-600">Personalized feed</div>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -337,6 +431,24 @@ const FeedPage = () => {
                             <span className="text-gray-500 text-sm">
                               @{post.author_username || 'anonymous'} · {formatTimeAgo(post.created_at)}
                             </span>
+                            {post.group_name && (
+                              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                c/{post.group_slug || post.group_name}
+                              </span>
+                            )}
+                            {post.source_scope && (
+                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full uppercase">
+                                {post.source_scope.replace('_', ' ')}
+                              </span>
+                            )}
+                            {post.group_id && (
+                              <Link
+                                to={post.group_slug ? `/r/${post.group_slug}` : `/community/${post.group_id}`}
+                                className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                              >
+                                c/{post.group_name || 'community'}
+                              </Link>
+                            )}
                             {/* TODO: Add category display when backend supports it */}
                           </div>
                           <div className="flex items-center space-x-2">
@@ -345,7 +457,7 @@ const FeedPage = () => {
                               <button
                                 onClick={() => {
                                   // Send friend request
-                                  handleSendFriendRequest(post.author.username);
+                                  handleSendMessageRequest(post.user_id || post.author?.id);
                                 }}
                                 className="text-gray-500 hover:text-green-600 transition-colors"
                                 title="Send friend request"
@@ -412,7 +524,7 @@ const FeedPage = () => {
                             <span className="text-sm">{post.likes_count || 0}</span>
                           </button>
                           <button 
-                            onClick={() => handleComment(post.id)}
+                            onClick={() => handleComment(post)}
                             className="flex items-center space-x-1 text-gray-500 hover:text-blue-600 transition-colors"
                           >
                             <span>💬</span>
@@ -444,23 +556,33 @@ const FeedPage = () => {
               </p>
             </div>
 
-            {/* Popular Communities */}
+            {/* Suggested Communities */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Popular Communities</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">Suggested Communities</h3>
               <div className="space-y-2">
-                {categories.slice(1, 5).map(cat => (
+                {suggestedCommunities.map((community) => {
+                  const path = community?.slug
+                    ? `/r/${community.slug}`
+                    : `/community/${community.id}`;
+                  const memberCount = community?.member_count ?? community?.members_count ?? community?.members ?? 0;
+
+                  return (
                   <Link
-                    key={cat.id}
-                    to={`/communities/${cat.id}`}
+                    key={community.id}
+                    to={path}
                     className="flex items-center justify-between p-2 rounded hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center space-x-2">
-                      <span>{cat.icon}</span>
-                      <span className="text-sm font-medium">g/{cat.name.toLowerCase()}</span>
+                      <span>🏘️</span>
+                      <span className="text-sm font-medium">g/{community.slug || community.name}</span>
                     </div>
-                    <span className="text-xs text-gray-500">{Math.floor(Math.random() * 10000)} members</span>
+                    <span className="text-xs text-gray-500">{memberCount} members</span>
                   </Link>
-                ))}
+                  );
+                })}
+                {communities.length === 0 && (
+                  <p className="text-xs text-gray-500">No communities available yet.</p>
+                )}
               </div>
             </div>
 
@@ -471,11 +593,11 @@ const FeedPage = () => {
                 <Link to="/communities" className="block text-sm text-blue-600 hover:text-blue-700">
                   🏘️ Browse Communities
                 </Link>
-                <Link to="/friends" className="block text-sm text-blue-600 hover:text-blue-700">
-                  👥 Find Friends
+                <Link to="/requests" className="block text-sm text-blue-600 hover:text-blue-700">
+                  👥 Request Center
                 </Link>
-                <Link to="/messages" className="block text-sm text-blue-600 hover:text-blue-700">
-                  💬 Messages
+                <Link to="/inbox" className="block text-sm text-blue-600 hover:text-blue-700">
+                  💬 Inbox
                 </Link>
                 <Link to="/profile" className="block text-sm text-blue-600 hover:text-blue-700">
                   👤 Profile

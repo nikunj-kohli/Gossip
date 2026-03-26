@@ -4,12 +4,10 @@ const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
 const GamificationService = require('../services/gamificationService');
 
-// Create new post
+// Create new post (optionally in a community/group)
 const createPost = async (req, res) => {
     try {
-        const { content, isAnonymous = false, postType = 'text', visibility = 'public' } = req.body;
-        
-        console.log('Post creation request body:', req.body); // Debug what we receive
+        const { content, isAnonymous = false, postType = 'text', visibility = 'public', groupId = null } = req.body;
         
         // Validation
         if (!content || content.trim().length === 0) {
@@ -25,18 +23,44 @@ const createPost = async (req, res) => {
             return res.status(400).json({ message: 'Invalid visibility option' });
         }
 
+        // If groupId is provided, verify user is a member of that group
+        if (groupId) {
+            try {
+                const isMember = await GroupMember.findOne({
+                    where: { group_id: groupId, user_id: req.user.id }
+                });
+                if (!isMember) {
+                    return res.status(403).json({ message: 'You are not a member of this community' });
+                }
+            } catch (memberCheckError) {
+                console.error('Error checking group membership:', memberCheckError);
+                return res.status(500).json({ message: 'Error verifying group membership' });
+            }
+        }
+
         // Try to create post in database
         try {
             // Create post
-            const post = await Post.create({
-                userId: req.user.id,
-                content: content.trim(),
-                isAnonymous,
-                postType,
-                visibility
-            });
-            
-            console.log('Post created in database:', post); // Debug what was created
+            let post;
+            if (groupId) {
+                // Create post in a specific group
+                post = await Post.createInGroup({
+                    userId: req.user.id,
+                    groupId,
+                    content: content.trim(),
+                    isAnonymous,
+                    postType
+                });
+            } else {
+                // Create regular post
+                post = await Post.create({
+                    userId: req.user.id,
+                    content: content.trim(),
+                    isAnonymous,
+                    postType,
+                    visibility
+                });
+            }
 
             // Award points for creating a post (if gamification is available)
             try {
@@ -79,6 +103,11 @@ const createGroupPost = async (req, res) => {
         const { content, isAnonymous = false, postType = 'text' } = req.body;
         const userId = req.user.id;
 
+        const group = await Group.getByIdOrSlug(groupId, userId);
+        if (!group) {
+            return res.status(404).json({ message: 'Group not found' });
+        }
+
         // Validate content
         if (!content || content.trim().length === 0) {
             return res.status(400).json({ message: 'Post content is required' });
@@ -90,7 +119,9 @@ const createGroupPost = async (req, res) => {
 
         // Check if user is a member of the group
         const isMember = await GroupMember.isMember(groupId, userId);
-        if (!isMember.success) {
+        const isCreator = parseInt(group.creator_id) === parseInt(userId);
+
+        if (!isMember.success && !isCreator) {
             return res.status(403).json({ message: 'You must be a member of this group to post' });
         }
 
@@ -127,21 +158,49 @@ const getAllPosts = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 20;
         const offset = parseInt(req.query.offset) || 0;
+        const mode = (req.query.mode || 'hybrid').toLowerCase();
         
         let posts;
         
         // Try to get posts from database
         try {
-            // If authenticated, show posts visible to user (public + friends)
             if (req.user) {
-                console.log('Fetching posts for authenticated user:', req.user.id);
-                posts = await Post.getVisibleToUser(req.user.id, limit, offset);
-                console.log('Posts returned for user:', posts.length);
+                const userId = req.user.id;
+
+                if (mode === 'pulse') {
+                    posts = await Post.getPulseFeedForUser(userId, limit, offset);
+                } else if (mode === 'tribes') {
+                    posts = await Post.getCommunityPostsForUser(userId, limit, offset);
+                } else {
+                    const prefs = await Post.getFeedPreferences(userId);
+                    const pulseLimit = Math.max(1, Math.floor(limit * Number(prefs.pulse_ratio || 0.5)));
+                    const tribesLimit = Math.max(1, Math.floor(limit * Number(prefs.tribes_ratio || 0.3)));
+                    const suggestLimit = Math.max(1, limit - pulseLimit - tribesLimit);
+
+                    const [pulsePosts, communityPosts, suggestedPosts] = await Promise.all([
+                        Post.getPulseFeedForUser(userId, pulseLimit, offset),
+                        Post.getCommunityPostsForUser(userId, tribesLimit, offset),
+                        Post.getSuggestedCommunityPosts(userId, suggestLimit, offset),
+                    ]);
+
+                    const merged = [...pulsePosts, ...communityPosts, ...suggestedPosts];
+                    const byId = new Map();
+                    merged.forEach((post) => byId.set(post.id, post));
+                    posts = Array.from(byId.values())
+                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                        .slice(0, limit);
+                }
             } else {
-                // For non-authenticated users, only show public posts
-                console.log('Fetching public posts for anonymous user');
-                posts = await Post.getAll(limit, offset);
-                console.log('Public posts returned:', posts.length);
+                const publicPulse = await Post.getAll(Math.max(1, Math.floor(limit * 0.7)), offset);
+                const publicCommunity = await Post.getRandomPublicGroupPosts(null, Math.max(1, limit - publicPulse.length));
+                const byId = new Map();
+                [...publicPulse, ...publicCommunity].forEach((post) => {
+                    const source = post.group_id ? 'suggested_community' : 'pulse';
+                    byId.set(post.id, { ...post, source_scope: source });
+                });
+                posts = Array.from(byId.values())
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .slice(0, limit);
             }
         } catch (dbError) {
             console.error('Database error, returning mock posts:', dbError.message);
@@ -182,11 +241,104 @@ const getAllPosts = async (req, res) => {
                 limit,
                 offset,
                 count: posts.length
-            }
+            },
+            mode
         });
     } catch (error) {
         console.error('Error fetching posts:', error);
         res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const getDiscoverPosts = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const offset = parseInt(req.query.offset, 10) || 0;
+
+        const posts = await Post.getSuggestedCommunityPosts(userId, limit, offset);
+
+        return res.json({
+            posts,
+            pagination: {
+                limit,
+                offset,
+                count: posts.length,
+            },
+        });
+    } catch (error) {
+        console.error('Error fetching discover posts:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const getFeedPreferences = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const preferences = await Post.getFeedPreferences(userId);
+        return res.json({ preferences });
+    } catch (error) {
+        console.error('Error fetching feed preferences:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const updateFeedPreferences = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const preferences = await Post.upsertFeedPreferences(userId, req.body || {});
+        return res.json({ preferences });
+    } catch (error) {
+        console.error('Error updating feed preferences:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const markPostNotInterested = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const postId = parseInt(req.params.id, 10);
+        if (!postId) {
+            return res.status(400).json({ message: 'Invalid post id' });
+        }
+
+        await Post.markPostNotInterested(userId, postId);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error marking post as not interested:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const warnCommunityPost = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const moderatorId = req.user.id;
+
+        const result = await Post.warnInCommunity(id, moderatorId, reason || null);
+
+        return res.json({
+            message: 'Post author warned successfully',
+            action: result.action,
+            warnedUserId: result.warnedUserId
+        });
+    } catch (error) {
+        console.error('Warn community post error:', error);
+
+        if (error.message === 'Post not found') {
+            return res.status(404).json({ message: error.message });
+        }
+
+        if (error.message === 'Only community posts can be warned by community moderators') {
+            return res.status(400).json({ message: error.message });
+        }
+
+        if (error.message === 'Unauthorized to warn this post' || error.message === 'You cannot warn your own post') {
+            return res.status(403).json({ message: error.message });
+        }
+
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -199,7 +351,7 @@ const getGroupPosts = async (req, res) => {
         const offset = parseInt(req.query.offset) || 0;
 
         // Check if group exists and if user has access
-        const group = await Group.findById(groupId);
+        const group = await Group.getByIdOrSlug(groupId, userId);
         if (!group) {
             return res.status(404).json({ message: 'Group not found' });
         }
@@ -243,6 +395,56 @@ const getPostById = async (req, res) => {
     } catch (error) {
         console.error('Get post error:', error);
         res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const getPostByPermalink = async (req, res) => {
+    try {
+        const { communitySlug, headline, dateAndToken } = req.params;
+        const dateToken = String(dateAndToken || '').slice(0, 8);
+        const token = String(dateAndToken || '').slice(9);
+        const userId = req.user ? req.user.id : null;
+
+        const post = await Post.findByPermalink({
+            communitySlug: communitySlug || null,
+            headline,
+            dateToken,
+            token,
+            userId,
+        });
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        return res.json({ post });
+    } catch (error) {
+        console.error('Get post by permalink error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const sharePost = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user ? req.user.id : null;
+
+        const post = await Post.findById(id, userId);
+        if (!post || !post.is_active) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        const shareResult = await Post.registerShare(id, userId);
+        const permalink = post.permalink || Post.buildPermalinkFromRow(post);
+
+        return res.json({
+            message: 'Post shared',
+            permalink,
+            shareCount: shareResult.shareCount,
+        });
+    } catch (error) {
+        console.error('Share post error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -457,11 +659,18 @@ module.exports = {
     createPost,
     createGroupPost,
     getAllPosts,
+    getDiscoverPosts,
+    getFeedPreferences,
+    updateFeedPreferences,
+    markPostNotInterested,
+    getPostByPermalink,
+    sharePost,
     getGroupPosts,
     getPostById,
     getUserPosts,
     updatePost,
     deletePost,
+    warnCommunityPost,
     likePost,
     unlikePost,
     getPostLikes

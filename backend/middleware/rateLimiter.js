@@ -6,9 +6,9 @@ let redisClient;
 
 try {
   redisClient = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT) || 6379,
-  password: process.env.REDIS_PASSWORD,  // ADD THIS LINE
+  host: config.redis.host,
+  port: config.redis.port,
+  password: config.redis.password,
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3,
   // Add connection timeout

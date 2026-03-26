@@ -1,5 +1,5 @@
 const express = require('express');
-const { addComment, getComments, deleteComment } = require('../controllers/commentController');
+const { addComment, getComments, deleteComment, toggleCommentLike } = require('../controllers/commentController');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -12,5 +12,8 @@ router.get('/posts/:id/comments', optionalAuth, getComments);
 
 // Delete a comment
 router.delete('/posts/:id/comments/:commentId', authenticateToken, deleteComment);
+
+// Toggle like on a comment
+router.post('/posts/:id/comments/:commentId/like', authenticateToken, toggleCommentLike);
 
 module.exports = router;

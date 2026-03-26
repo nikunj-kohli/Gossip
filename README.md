@@ -1,240 +1,265 @@
-# Gossip - Modern Social Networking Platform
+# Gossip
 
-![Gossip Logo](https://via.placeholder.com/200x60?text=Gossip)
+Production-oriented social platform with communities, feed ranking modes, request-based messaging, media uploads, realtime sockets, gamification hooks, and hardened API runtime.
 
-## Overview
+## What This Project Is
 
-Gossip is a feature-rich social networking platform designed to connect people through shared interests, groups, and personal interactions. The platform combines traditional social networking capabilities with modern features like gamification, real-time interactions, and comprehensive privacy controls.
+Gossip is a full-stack system with:
 
-## Key Features
+- Node.js/Express API backend
+- React + Vite frontend
+- Dockerized runtime (backend + nginx frontend)
+- PostgreSQL + Redis integration
+- Cloudinary media pipeline
+- Sentry error monitoring (backend + frontend)
 
-### Core Features
+This repository is currently set up to run locally with Docker and deploy as containerized services.
 
-- **User Management**
-  - Registration and authentication
-  - Profile customization
-  - Privacy settings
-  - User roles and permissions
+## Technical Highlights
 
-- **Content Sharing**
-  - Text, image, and media posts
-  - Privacy-controlled content visibility
-  - Anonymous posting option
-  - Rich text formatting
+- Layered backend design: routes -> controllers -> models/services
+- Request-path hardening with Helmet, CSP, CORS allowlist, CSRF handling, and multi-level rate limiting
+- Query-level observability and slow-query reporting endpoint for admins
+- Resilience pattern support with circuit breakers and cache fallback paths
+- Feed architecture supports hybrid content blending and community-aware ranking
+- Request-gated inbox flow (request/accept/decline/cancel/remove) instead of open DMs
+- Container-native health and readiness probes (`/health`, `/ready`)
+- Reverse-proxy optimization in nginx (keepalive upstream, proxy buffering, static asset cache headers)
 
-- **Social Interactions**
-  - Friend/connection system
-  - Post likes and reactions
-  - Threaded comments
-  - @mentions and tagging
+## Stack
 
-- **Groups & Communities**
-  - Public, private, and secret groups
-  - Group moderation tools
-  - Group-specific content
-  - Role-based permissions
+Backend:
 
-- **Messaging**
-  - Private messaging
-  - Group chats
-  - Real-time notifications
-  - Read receipts
+- Node.js + Express
+- PostgreSQL (`pg`)
+- Redis (`ioredis`)
+- Socket.IO
+- Swagger OpenAPI
+- Winston logging
+- Prometheus metrics (`prom-client`)
+- Sentry Node SDK
 
-### Advanced Features
+Frontend:
 
-- **Gamification System**
-  - Points and reputation
-  - Achievements and badges
-  - Leaderboards
-  - Rewards for participation
+- React 19 + Vite
+- React Router
+- Axios
+- Socket.IO client
+- Sentry React SDK
 
-- **Real-time Features**
-  - Live notifications
-  - Typing indicators
-  - Presence awareness
-  - Live content updates
+Infra:
 
-- **Content Discovery**
-  - Personalized feed
-  - Trending content
-  - Interest-based recommendations
-  - Advanced search
+- Docker Compose
+- nginx for frontend serving + API proxying
 
-- **Platform Enhancements**
-  - Email notifications
-  - API rate limiting
-  - Caching layer
-  - Analytics and logging
-  - API documentation
+## Architecture Snapshot
 
-## Technology Stack
+```text
+Browser (React/Vite)
+  -> nginx container (client)
+    -> /api/* proxied to backend container
+      -> controllers/models/services
+        -> PostgreSQL
+        -> Redis
+        -> Cloudinary
+        -> Sentry
+```
 
-### Backend
-- **Framework**: Node.js with Express
-- **Database**: PostgreSQL
-- **Caching**: Redis
-- **Authentication**: JWT (JSON Web Tokens)
-- **Real-time**: Socket.IO
-- **Documentation**: Swagger/OpenAPI
+## Repository Layout
 
-### Frontend (Planned)
-- **Framework**: React with Vite
-- **State Management**: Redux Toolkit / Context API
-- **Styling**: CSS-in-JS (Styled Components/Emotion)
-- **Routing**: React Router
-- **API Client**: Axios/React Query
+```text
+backend/
+  config/
+  controllers/
+  middleware/
+  models/
+  routes/
+  services/
+  utils/
+client/
+  src/
+docker-compose.yml
+```
 
-### DevOps & Infrastructure
-- **Containerization**: Docker (planned)
-- **CI/CD**: GitHub Actions (planned)
-- **Monitoring**: Prometheus with Grafana (implemented)
-- **Testing**: Jest, Supertest, Cypress (planned)
+## API Surface (Current)
 
-## System Architecture
+Main backend route groups:
 
-The application follows a layered architecture:
+- `/api/auth`
+- `/api/posts`
+- `/api/users`
+- `/api/requests`
+- `/api/groups`
+- `/api/inbox`
+- `/api/notifications`
+- `/api/media`
+- `/api/search`
+- `/api/reports`
+- `/api/moderation`
+- `/api/chat`
+- `/api/gamification`
+- `/api/metrics`
 
-1. **Presentation Layer**: API endpoints and WebSocket connections
-2. **Business Logic Layer**: Controllers and services
-3. **Data Access Layer**: Models and database interactions
-4. **Infrastructure Layer**: Cross-cutting concerns like logging, caching, security
+Operational endpoints:
 
-### Key Design Principles
-- RESTful API design
-- Service-oriented architecture
-- Repository pattern for data access
-- Circuit breakers for resilience
-- Rate limiting for API protection
-- Comprehensive error handling
+- `/health`
+- `/ready`
+- `/api-docs`
+- `/api-docs.json`
 
-## Getting Started
+Admin-only diagnostics:
+
+- `/api/admin/circuit-breakers`
+- `/api/admin/slow-queries`
+
+## Run With Docker (Recommended)
 
 ### Prerequisites
-- Node.js (v14+)
-- PostgreSQL (v12+)
-- Redis (v6+)
-- npm or yarn
 
-### Installation
+- Docker + Docker Compose
 
-1. Clone the repository
+### Start
+
 ```bash
-git clone https://github.com/yourusername/gossip.git
-cd gossip
+docker compose up -d --build
 ```
 
-2. Install dependencies
+### Check
+
 ```bash
-npm install
+docker compose ps
+curl http://127.0.0.1:5000/health
+curl http://127.0.0.1:5000/ready
+curl -I http://127.0.0.1:3000
 ```
 
-3. Set up environment variables
+### Stop
+
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+docker compose down
 ```
 
-4. Run database migrations
+### Optional local infra profile
+
+If you explicitly want local Postgres + Redis containers:
+
 ```bash
-npm run migrate
+docker compose --profile local-infra up -d
 ```
 
-5. Start the server
+## Run Without Docker
+
+Backend:
+
 ```bash
+cd backend
+npm install --legacy-peer-deps
 npm run dev
 ```
 
-### Database Setup
+Frontend:
 
-The application uses PostgreSQL with structured migrations. The database schema includes:
-
-- User management tables
-- Content and interaction tables
-- Social connection tables
-- Group and membership tables
-- Gamification system tables
-- System management tables
-
-Run migrations using:
 ```bash
-npm run migrate
+cd client
+npm install
+npm run dev
 ```
 
-## API Documentation
+Note:
 
-API documentation is available at `/api-docs` when the server is running. It provides:
+- The frontend defaults `VITE_API_URL` to `/api`.
+- For non-nginx local dev, set `VITE_API_URL` to your backend base (for example `http://localhost:5000/api`).
 
-- Endpoint specifications
-- Request/response formats
-- Authentication requirements
-- Example requests
+## Configuration
 
-## Security Features
+Runtime env is loaded from backend-focused env files.
 
-- JWT-based authentication
-- Password hashing with bcrypt
-- CSRF protection
-- Rate limiting
-- Input validation
-- SQL injection prevention
-- XSS protection
-- Circuit breakers for dependent services
+High-impact variables:
 
-## Resilience & Performance
+- `NODE_ENV`
+- `PORT`
+- `DATABASE_URL`
+- `DB_SSL`, `DB_MAX_CONNECTIONS`, `DB_IDLE_TIMEOUT`, `DB_CONNECTION_TIMEOUT`
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
+- `JWT_SECRET`, `JWT_EXPIRES_IN`
+- `CORS_ORIGINS`
+- `ENABLE_CACHING`, `ENABLE_RATE_LIMITING`, `ENABLE_MONITORING`
+- `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`
+- `VITE_API_URL`, `VITE_SENTRY_DSN`
 
-- Redis caching for performance
-- Memory fallbacks for service failures
-- Database query monitoring
-- Batch processing for high-volume operations
-- Comprehensive logging
-- Health check endpoints
+## Security Model
 
-## Testing
+- JWT auth
+- CSRF middleware with selective route protection
+- CORS origin allowlist strategy
+- Helmet headers + CSP
+- Rate limiting on global API, auth, and write-heavy paths
+- Error response sanitization in production
+- Admin route protection via auth + role checks
 
-The project includes:
+## Performance and Reliability
 
-- Unit tests for business logic
-- Integration tests for API endpoints
-- Edge case tests for validation
-- Load testing configurations
-- Security testing tooling
+- DB pooling with max/timeout tuning and keepalive
+- gzip compression for API responses
+- Redis-backed throttling and cache integration
+- Slow-query instrumentation and report endpoint
+- nginx upstream keepalive to reduce backend connection churn
+- Health + readiness probes for orchestrator-safe rollouts
+- Graceful shutdown with DB pool close and timeout fallback
 
-Run tests with:
+## Observability
+
+- Prometheus metrics middleware and export endpoint
+- Structured + request logging via Winston
+- Sentry capture in backend and frontend
+- Runtime health: `/health`
+- Dependency readiness: `/ready`
+
+## Sentry
+
+Sentry is integrated in both tiers.
+
+Set:
+
+- Backend: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`
+- Frontend: `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_SENTRY_TRACES_SAMPLE_RATE`
+
+Rebuild containers after env changes:
+
 ```bash
-npm test
+docker compose up -d --build
 ```
 
-## Project Roadmap
+## Deployment Notes
 
-### Short-term Goals
-- Complete frontend implementation in React
-- Add media upload and processing features
-- Implement real-time notifications
-- Enhance mobile responsiveness
+For no-card deployments, a practical path is:
 
-### Medium-term Goals
-- Build native mobile applications
-- Implement content recommendation engine
-- Add video streaming capabilities
-- Develop plugin/extension system
+- Backend container host (free tier)
+- Static frontend host (free tier)
+- Managed Postgres/Redis/Cloudinary already externalized
 
-### Long-term Vision
-- Create a decentralized social networking option
-- Implement AI-driven content moderation
-- Support third-party app integrations
-- Build developer marketplace for platform extensions
+Before production rollout:
 
-## Contributing
+- Rotate all credentials/secrets
+- Set strict `CORS_ORIGINS`
+- Ensure `NODE_ENV=production`
+- Restrict or disable public API docs if required
+- Verify health/readiness probes on target platform
 
-We welcome contributions to Gossip! Please see our Contributing Guidelines for details on how to submit pull requests, report issues, and suggest features.
+## Current Scripts
 
+Backend:
 
-## Acknowledgements
+- `npm run dev`
+- `npm run start`
 
-- Open source libraries and frameworks that made this project possible
-- The community for feedback and contributions
-- All developers and designers who contributed to the project
+Frontend:
 
----
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
+- `npm run lint`
 
-© 2025 Gossip. All rights reserved.
+## Project Status
+
+This README intentionally documents only active, verifiable capabilities from the current codebase and runtime configuration.

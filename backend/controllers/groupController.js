@@ -1,5 +1,6 @@
 const Group = require('../models/Group');
 const User = require('../models/User');
+const { getDefaultGroupCoverUrl, getFallbackGroupCoverUrl } = require('../utils/groupVisuals');
 
 // Create new group
 const createGroup = async (req, res) => {
@@ -22,13 +23,16 @@ const createGroup = async (req, res) => {
         }
         
         // Create group
+        const generatedCoverUrl = coverUrl || getDefaultGroupCoverUrl({ name, description });
+        const safeCoverUrl = generatedCoverUrl || getFallbackGroupCoverUrl({ name });
+
         const group = await Group.create({
             name,
             description,
             privacy,
             creatorId: req.user.id,
             avatarUrl,
-            coverUrl
+            coverUrl: safeCoverUrl
         });
         
         res.status(201).json({
@@ -101,6 +105,26 @@ const getGroupById = async (req, res) => {
     }
 };
 
+// Get group by name/slug
+const getGroupByName = async (req, res) => {
+    try {
+        const { name } = req.params;
+        const userId = req.user ? req.user.id : null;
+        
+        const result = await Group.getByName(name, { currentUserId: userId });
+        
+        if (!result || result.length === 0) {
+            return res.status(404).json({ message: 'Group not found' });
+        }
+        
+        res.json({ group: result[0] });
+        
+    } catch (error) {
+        console.error('Get group by name error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 // Get groups created by current user
 const getUserGroups = async (req, res) => {
     try {
@@ -126,9 +150,11 @@ const getUserMemberships = async (req, res) => {
         const userId = req.user.id;
         const { limit = 20, offset = 0 } = req.query;
         
+        // Use the current user's ID as the memberId parameter
         const result = await Group.getByMember(userId, {
             limit: parseInt(limit),
-            offset: parseInt(offset)
+            offset: parseInt(offset),
+            currentUserId: userId // Pass current user for visibility logic
         });
         
         res.json(result);
@@ -207,6 +233,7 @@ module.exports = {
     createGroup,
     getAllGroups,
     getGroupById,
+    getGroupByName,
     getUserGroups,
     getUserMemberships,
     updateGroup,

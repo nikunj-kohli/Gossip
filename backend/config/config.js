@@ -1,6 +1,7 @@
-require('dotenv').config();
+require('./loadEnv');
 
 const env = process.env.NODE_ENV || 'development';
+const isProd = env === 'production';
 
 const config = {
   // Application name and details
@@ -10,7 +11,7 @@ const config = {
   // Environment
   env: env,
   isDev: env === 'development',
-  isProd: env === 'production',
+  isProd: isProd,
   isTest: env === 'test',
   
   // Server configuration
@@ -27,13 +28,13 @@ const config = {
   // Database configuration
   database: {
     url: process.env.DATABASE_URL,
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || (isProd ? undefined : 'localhost'),
     port: parseInt(process.env.DB_PORT) || 5432,
-    name: process.env.DB_NAME || 'gossip',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    ssl: process.env.DB_SSL === 'true' || !!process.env.DATABASE_URL, // Auto-enable SSL if using DATABASE_URL
-    maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
+    name: process.env.DB_NAME || (isProd ? undefined : 'gossip'),
+    user: process.env.DB_USER || (isProd ? undefined : 'postgres'),
+    password: process.env.DB_PASSWORD || (isProd ? undefined : 'postgres'),
+    ssl: process.env.DB_SSL === 'true' || !!process.env.DATABASE_URL,
+    maxConnections: env === 'production' ? parseInt(process.env.DB_MAX_CONNECTIONS) || 50 : 20,
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000
   },
@@ -90,9 +91,9 @@ const config = {
   
   // Redis configuration
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
+    host: process.env.REDIS_HOST || (isProd ? undefined : 'localhost'),
     port: parseInt(process.env.REDIS_PORT) || 6379,
-    password: process.env.REDIS_PASSWORD || '',
+    password: process.env.REDIS_PASSWORD || (isProd ? undefined : ''),
     db: parseInt(process.env.REDIS_DB) || 0
   },
   
@@ -143,5 +144,22 @@ const config = {
     maxLimit: parseInt(process.env.MAX_PAGINATION_LIMIT) || 100
   }
   };
+
+if (isProd) {
+  const requiredEnv = [
+    'DATABASE_URL',
+    'REDIS_HOST',
+    'REDIS_PASSWORD',
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET',
+    'JWT_SECRET'
+  ];
+
+  const missing = requiredEnv.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+  }
+}
 
 module.exports = config;

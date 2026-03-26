@@ -1,0 +1,96 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: gossip-backend:latest
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      DB_SSL: "true"
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - gossip_net
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://ahgcbxvsftukcsmgujyx.supabase.co}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoZ2NieHZzZnR1a2NzbWd1anl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MjA3ODUsImV4cCI6MjA4OTI5Njc4NX0.f0luiLyW0LBc7wIr4bc8YIb58_qV3cULTxvanQJncOc}
+        VITE_SUPABASE_STORAGE_BUCKET: ${VITE_SUPABASE_STORAGE_BUCKET:-chat-attachments}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-development}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE:-0.1}
+    image: gossip-client:latest
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gossip_net
+
+  redis:
+    profiles: ["local-infra"]
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis-dev-password}
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - gossip_net
+
+  postgres:
+    profiles: ["local-infra"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gossip}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - gossip_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  gossip_net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "true"
