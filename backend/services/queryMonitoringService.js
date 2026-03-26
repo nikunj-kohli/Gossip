@@ -131,6 +131,7 @@ const poolConfig = dbConfig
       user: dbConfig.user,
       password: dbConfig.password,
       ssl: { rejectUnauthorized: false },
+      family: 4,
       max: config.database.maxConnections,
       idleTimeoutMillis: config.database.idleTimeoutMillis,
       connectionTimeoutMillis: config.database.connectionTimeoutMillis
@@ -142,6 +143,7 @@ const poolConfig = dbConfig
       user: config.database.user,
       password: config.database.password,
       ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+      family: 4,
       max: config.database.maxConnections,
       idleTimeoutMillis: config.database.idleTimeoutMillis,
       connectionTimeoutMillis: config.database.connectionTimeoutMillis

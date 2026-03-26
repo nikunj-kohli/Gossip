@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
@@ -124,6 +125,7 @@ app.use(compression({
     return compression.filter(req, res);
   }
 }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(requestLogger);
 app.use(metricsMiddleware);
