@@ -33,7 +33,6 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Token might be expired or invalid
-      console.error('🚪', error.response.status, '- Token expired or invalid');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Redirect to login page
@@ -126,13 +125,10 @@ export const checkMessagingAccessStatus = async (username) => {
 
 export const getUserProfile = async (username) => {
   try {
-    console.log('Fetching user profile for username:', username); // Debug log
     const response = await api.get(`/users/${username}`);
-    console.log('Profile API response:', response.data); // Debug response
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching user profile:', error);
-    console.error('Error response:', error.response?.data); // Debug error response
     return { data: null, error };
   }
 };

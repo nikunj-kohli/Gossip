@@ -6,6 +6,7 @@ import { getPosts, getDiscoverPosts, getCommunities, getPostById, sharePost, tog
 const FeedPage = () => {
   const { user } = React.useContext(AuthContext);
   const navigate = useNavigate();
+  const profilePath = user?.username ? `/profile/${user.username}` : '/profile';
   const [posts, setPosts] = useState([]);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -386,7 +387,7 @@ const FeedPage = () => {
             {/* Posts Feed */}
             <div className="bg-white rounded-lg shadow-sm border p-4 mb-6 text-center">
               <div className="text-gray-600 text-sm">
-                Want to create a post? Visit your <Link to="/profile" className="text-blue-600 hover:text-blue-700 font-medium">profile/wall</Link> to share your thoughts!
+                Want to create a post? Visit your <Link to={profilePath} className="text-blue-600 hover:text-blue-700 font-medium">profile/wall</Link> to share your thoughts!
               </div>
             </div>
             <div className="space-y-4">
@@ -589,7 +590,7 @@ const FeedPage = () => {
                 <Link to="/inbox" className="block text-sm text-blue-600 hover:text-blue-700">
                   💬 Inbox
                 </Link>
-                <Link to="/profile" className="block text-sm text-blue-600 hover:text-blue-700">
+                <Link to={profilePath} className="block text-sm text-blue-600 hover:text-blue-700">
                   👤 Profile
                 </Link>
               </div>

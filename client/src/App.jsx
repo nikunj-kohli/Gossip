@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AuthProvider from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import RedirectAuth from './components/RedirectAuth';
@@ -19,6 +19,8 @@ import CommunityDetailPage from './pages/CommunityDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import CommonWall from './pages/CommonWall';
 import PostDetailPage from './pages/PostDetailPage';
+import SettingsPage from './pages/SettingsPage';
+import ProfileRedirect from './components/ProfileRedirect';
 import './App.css';
 
 function App() {
@@ -108,6 +110,11 @@ function App() {
                 <CommonWall />
               </ProtectedRoute>
             } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <ProfileRedirect />
+              </ProtectedRoute>
+            } />
             <Route path="/inbox" element={
               <ProtectedRoute>
                 <MessagesPage />
@@ -121,6 +128,11 @@ function App() {
             <Route path="/profile/:username" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             } />
             <Route path="/p/:headline/:dateAndToken" element={
