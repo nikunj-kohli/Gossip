@@ -366,7 +366,57 @@ class Post {
                 
             return this.applyAnonymityLabels(result.rows);
         } catch (error) {
-            throw error;
+            // Backward-compatible fallback for environments missing newer group columns.
+            let fallbackQuery = `
+                SELECT
+                    p.id,
+                    p.user_id,
+                    p.content,
+                    p.is_anonymous,
+                    p.post_type,
+                    p.group_id,
+                    p.likes_count,
+                    p.comments_count,
+                    p.created_at,
+                    p.visibility,
+                    g.name as group_name,
+                    NULL::text as group_slug,
+                    CASE
+                        WHEN p.is_anonymous = true THEN 'Anonymous'
+                        ELSE u.display_name
+                    END as author_name,
+                    CASE
+                        WHEN p.is_anonymous = true THEN NULL
+                        ELSE u.username
+                    END as author_username
+            `;
+
+            if (userId) {
+                fallbackQuery += `,
+                    (SELECT EXISTS(
+                        SELECT 1 FROM likes
+                        WHERE post_id = p.id AND user_id = $4
+                    )) as user_liked
+                `;
+            } else {
+                fallbackQuery += `, false as user_liked`;
+            }
+
+            fallbackQuery += `
+                FROM posts p
+                LEFT JOIN users u ON p.user_id = u.id
+                LEFT JOIN groups g ON p.group_id = g.id
+                WHERE p.is_active = true
+                AND p.group_id = $1
+                ORDER BY p.created_at DESC
+                LIMIT $2 OFFSET $3
+            `;
+
+            const fallbackResult = userId
+                ? await db.query(fallbackQuery, [groupId, limit, offset, userId])
+                : await db.query(fallbackQuery, [groupId, limit, offset]);
+
+            return this.applyAnonymityLabels(fallbackResult.rows);
         }
     }
 
@@ -1055,7 +1105,60 @@ class Post {
             const result = await db.query(query, [userId, safeLimit, safeOffset]);
             return this.applyAnonymityLabels(result.rows);
         } catch (error) {
-            throw error;
+            // Fallback if optional moderation/reporting tables are not available.
+            const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 20, 100));
+            const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
+
+            const fallbackQuery = `
+                WITH user_joined_groups AS (
+                    SELECT gm.group_id
+                    FROM group_members gm
+                    WHERE gm.user_id = $1
+                    AND gm.is_banned = false
+                )
+                SELECT
+                    p.id,
+                    p.user_id,
+                    p.content,
+                    p.is_anonymous,
+                    p.post_type,
+                    p.group_id,
+                    p.likes_count,
+                    p.comments_count,
+                    p.created_at,
+                    p.visibility,
+                    CASE
+                        WHEN p.is_anonymous = true THEN 'Anonymous'
+                        ELSE u.display_name
+                    END as author_name,
+                    CASE
+                        WHEN p.is_anonymous = true THEN NULL
+                        ELSE u.username
+                    END as author_username,
+                    (SELECT EXISTS(
+                        SELECT 1 FROM likes
+                        WHERE post_id = p.id AND user_id = $1
+                    )) as user_liked,
+                    'suggested_community'::text as source_scope,
+                    g.name as group_name,
+                    COALESCE(g.slug, NULL) as group_slug
+                FROM posts p
+                JOIN groups g ON g.id = p.group_id
+                LEFT JOIN users u ON p.user_id = u.id
+                WHERE p.is_active = true
+                AND p.group_id IS NOT NULL
+                AND g.is_active = true
+                AND g.privacy = 'public'
+                AND NOT EXISTS (
+                    SELECT 1 FROM user_joined_groups uj
+                    WHERE uj.group_id = p.group_id
+                )
+                ORDER BY (p.likes_count * 0.3 + p.comments_count * 0.2) DESC, p.created_at DESC
+                LIMIT $2 OFFSET $3
+            `;
+
+            const fallbackResult = await db.query(fallbackQuery, [userId, safeLimit, safeOffset]);
+            return this.applyAnonymityLabels(fallbackResult.rows);
         }
     }
 
