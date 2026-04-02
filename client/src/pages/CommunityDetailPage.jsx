@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import {
   getCommunityById,
@@ -8,18 +8,23 @@ import {
   joinCommunity,
   leaveCommunity,
   getGroupPosts,
+  getPostById,
+  toggleLike,
+  sharePost,
   deletePost,
   warnCommunityPost,
 } from '../api';
 
 const CommunityDetailPage = () => {
   const { user } = React.useContext(AuthContext);
+  const navigate = useNavigate();
   const { communityName } = useParams();
   const [community, setCommunity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isMember, setIsMember] = useState(false);
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [postActionLoading, setPostActionLoading] = useState({});
 
   useEffect(() => {
     const fetchCommunity = async () => {
@@ -170,6 +175,93 @@ const CommunityDetailPage = () => {
     } catch (error) {
       console.error('Error deleting post:', error);
       alert('Failed to delete post');
+    }
+  };
+
+  const handleOpenPostDetail = async (post, focusComments = false) => {
+    try {
+      if (post?.permalink) {
+        navigate(focusComments ? `${post.permalink}#comments` : post.permalink);
+        return;
+      }
+
+      if (!post?.id) return;
+      const { data, error } = await getPostById(post.id);
+
+      if (!error && data?.permalink) {
+        navigate(focusComments ? `${data.permalink}#comments` : data.permalink);
+        return;
+      }
+
+      navigate(`/p/${post.id}${focusComments ? '#comments' : ''}`);
+    } catch (error) {
+      console.error('Error opening post detail:', error);
+      alert('Unable to open this post right now.');
+    }
+  };
+
+  const handleLikePost = async (postId) => {
+    setPostActionLoading((prev) => ({ ...prev, [postId]: true }));
+
+    try {
+      const { data, error } = await toggleLike(postId);
+      if (error) {
+        alert(error.response?.data?.message || 'Failed to toggle like');
+        return;
+      }
+
+      setPosts((prev) => prev.map((post) => {
+        if (post.id !== postId) return post;
+
+        const liked = Boolean(data?.liked);
+        const likesCount = Number(post.likes_count || 0) + (liked ? 1 : -1);
+
+        return {
+          ...post,
+          user_liked: liked,
+          likes_count: Math.max(0, likesCount),
+        };
+      }));
+    } catch (error) {
+      console.error('Error toggling post like:', error);
+      alert('Failed to toggle like');
+    } finally {
+      setPostActionLoading((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const handleSharePost = async (post) => {
+    try {
+      const { data, error } = await sharePost(post.id);
+      if (error) {
+        alert(error.response?.data?.message || 'Failed to share post');
+        return;
+      }
+
+      const permalink = data?.permalink || post.permalink;
+      if (!permalink) {
+        alert('Share link is unavailable right now.');
+        return;
+      }
+
+      const absoluteUrl = `${window.location.origin}${permalink}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Gossip Post',
+          text: 'Check out this post',
+          url: absoluteUrl,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(absoluteUrl);
+      alert('Post link copied to clipboard.');
+    } catch (error) {
+      // Ignore user-cancelled share sheet errors.
+      if (error?.name === 'AbortError') return;
+      console.error('Error sharing post:', error);
+      alert('Failed to share post');
     }
   };
 
@@ -366,9 +458,35 @@ const CommunityDetailPage = () => {
                             )}
                           </div>
                         </div>
-                        <p className="mt-3 text-gray-800 whitespace-pre-wrap">{post.content}</p>
+                        <p
+                          className="mt-3 text-gray-800 whitespace-pre-wrap cursor-pointer"
+                          onClick={() => handleOpenPostDetail(post)}
+                        >
+                          {post.content}
+                        </p>
                         <div className="mt-2 text-xs text-gray-500">
                           {(post.likes_count || 0)} likes · {(post.comments_count || 0)} comments
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            onClick={() => handleLikePost(post.id)}
+                            disabled={Boolean(postActionLoading[post.id])}
+                            className={`text-xs px-3 py-1 rounded ${post.user_liked ? 'bg-pink-100 text-pink-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} disabled:opacity-60`}
+                          >
+                            {post.user_liked ? 'Unlike' : 'Like'}
+                          </button>
+                          <button
+                            onClick={() => handleOpenPostDetail(post, true)}
+                            className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded"
+                          >
+                            Comment
+                          </button>
+                          <button
+                            onClick={() => handleSharePost(post)}
+                            className="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-1 rounded"
+                          >
+                            Share
+                          </button>
                         </div>
                       </div>
                     );
