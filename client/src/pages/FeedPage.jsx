@@ -23,7 +23,6 @@ const FeedPage = () => {
   ];
 
   useEffect(() => {
-    console.log('FeedPage useEffect triggered:', { feedMode, sortBy });
     fetchPosts();
   }, [feedMode, sortBy]);
 
@@ -49,7 +48,6 @@ const FeedPage = () => {
     // Prevent rapid-fire calls (minimum 2 seconds between calls)
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 2000) {
-      console.log('Skipping fetch - too soon since last call');
       return;
     }
     
@@ -64,14 +62,8 @@ const FeedPage = () => {
       
       if (error) throw error;
       
-      console.log('Raw API response data:', data); // Debug raw data
-      console.log('Data type:', typeof data);
-      console.log('Is array?:', Array.isArray(data));
-      
       // Ensure data is an array before proceeding
       let filteredPosts = Array.isArray(data) ? data : [];
-      
-      console.log('Fetched posts after array check:', filteredPosts.length); // Debug log
       
       // TODO: Add category filtering when backend supports it
       // For now, don't filter by category since backend doesn't return category field
@@ -80,8 +72,6 @@ const FeedPage = () => {
       if (sortBy !== 'hot') {
         filteredPosts = sortPosts(filteredPosts, sortBy);
       }
-      
-      console.log('Posts after sorting:', filteredPosts.length); // Debug final count
       
       setPosts(filteredPosts);
     } catch (err) {

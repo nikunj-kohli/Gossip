@@ -2,6 +2,14 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+const isRequestAborted = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === 'ERR_CANCELED'
+    || error?.name === 'CanceledError'
+    || message.includes('aborted')
+    || message.includes('canceled');
+};
+
 // Create axios instance with auth
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -26,7 +34,6 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // Token might be expired or invalid
       console.error('🚪', error.response.status, '- Token expired or invalid');
-      console.log('🧹 Clearing localStorage and redirecting...');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Redirect to login page
@@ -41,28 +48,20 @@ api.interceptors.response.use(
 // Posts (using backend API)
 export const getPosts = async ({ mode = 'hybrid', limit = 20, offset = 0 } = {}) => {
   try {
-    const token = localStorage.getItem('token');
-    console.log('Current auth token:', token ? 'exists' : 'none'); // Debug auth state
-    
     const response = await api.get('/posts', {
       params: { mode, limit, offset },
     });
-    console.log('Raw API response:', response.data); // Debug raw response
     
     // Handle different response structures
     let postsData = response.data;
     
     // If response has posts property, extract it
     if (response.data && response.data.posts) {
-      console.log('Extracting posts from response.data.posts');
       postsData = response.data.posts;
-    } else {
-      console.log('Using response.data directly');
     }
     
     // Ensure we always return an array
     const postsArray = Array.isArray(postsData) ? postsData : [];
-    console.log('Final posts array length:', postsArray.length);
     
     return { data: postsArray, error: null };
   } catch (error) {
@@ -259,7 +258,9 @@ export const getCommunityById = async (communityId) => {
     const response = await api.get(`/groups/${communityId}`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error fetching community:', error);
+    if (!isRequestAborted(error)) {
+      console.error('Error fetching community:', error);
+    }
     return { data: null, error };
   }
 };
@@ -269,7 +270,9 @@ export const getCommunityByName = async (communityName) => {
     const response = await api.get(`/groups/name/${communityName}`);
     return { data: response.data, error: null };
   } catch (error) {
-    console.error('Error fetching community by name:', error);
+    if (!isRequestAborted(error)) {
+      console.error('Error fetching community by name:', error);
+    }
     return { data: null, error };
   }
 };
