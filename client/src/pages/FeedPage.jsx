@@ -193,6 +193,23 @@ const FeedPage = () => {
     }
   };
 
+  const extractMediaFromContent = (content = '') => {
+    const urlRegex = /https?:\/\/[^\s]+/gi;
+    const urls = String(content).match(urlRegex) || [];
+    const imageRegex = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
+    const videoRegex = /\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i;
+
+    const images = urls.filter((url) => imageRegex.test(url) || /\/image\/upload\//i.test(url));
+    const videos = urls.filter((url) => videoRegex.test(url) || /\/video\/upload\//i.test(url));
+    const nonMediaUrls = new Set([...images, ...videos]);
+    const text = String(content)
+      .replace(urlRegex, (url) => (nonMediaUrls.has(url) ? '' : url))
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return { text, images, videos };
+  };
+
   const slugifyText = (text = 'post') =>
     String(text)
       .toLowerCase()
@@ -387,7 +404,9 @@ const FeedPage = () => {
                   <p className="text-gray-400 mt-2">Be the first to share something!</p>
                 </div>
               ) : (
-                posts.map((post) => (
+                posts.map((post) => {
+                  const media = extractMediaFromContent(post.content);
+                  return (
                   <div key={post.id} className="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start space-x-3">
                       <img
@@ -491,9 +510,35 @@ const FeedPage = () => {
                               </div>
                             </div>
                           ) : (
-                            post.content
+                            media.text
                           )}
                         </div>
+                        {editingPost !== post.id && media.images.length > 0 && (
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {media.images.map((url, idx) => (
+                              <img
+                                key={`${post.id}-img-${idx}`}
+                                src={url}
+                                alt="Post media"
+                                className="w-full rounded-lg border object-contain bg-gray-50 max-h-[520px]"
+                                loading="lazy"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {editingPost !== post.id && media.videos.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {media.videos.map((url, idx) => (
+                              <video
+                                key={`${post.id}-vid-${idx}`}
+                                src={url}
+                                controls
+                                preload="metadata"
+                                className="w-full rounded-lg border bg-black max-h-[520px]"
+                              />
+                            ))}
+                          </div>
+                        )}
                         <div className="mt-4 flex items-center space-x-6">
                           <button
                             onClick={() => handleLike(post.id)}
@@ -522,7 +567,8 @@ const FeedPage = () => {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
