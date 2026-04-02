@@ -317,6 +317,7 @@ class Post {
             let query = `
                 SELECT 
                     p.id, 
+                    p.user_id,
                     p.content,
                     p.is_anonymous, 
                     p.post_type,
@@ -325,6 +326,8 @@ class Post {
                     p.comments_count,
                     p.created_at,
                     p.visibility,
+                    g.name as group_name,
+                    g.slug as group_slug,
                     CASE 
                         WHEN p.is_anonymous = true THEN 'Anonymous'
                         ELSE u.display_name
@@ -340,7 +343,7 @@ class Post {
                 query += `,
                     (SELECT EXISTS(
                         SELECT 1 FROM likes 
-                        WHERE post_id = p.id AND user_id = $3
+                        WHERE post_id = p.id AND user_id = $4
                     )) as user_liked
                 `;
             } else {
@@ -350,6 +353,7 @@ class Post {
             query += `
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
+                LEFT JOIN groups g ON p.group_id = g.id
                 WHERE p.is_active = true
                 AND p.group_id = $1
                 ORDER BY p.created_at DESC
@@ -942,7 +946,6 @@ class Post {
                     SELECT 1 FROM group_members gm
                     WHERE gm.group_id = p.group_id
                     AND gm.user_id = $1
-                    AND gm.status = 'active'
                     AND gm.is_banned = false
                 )
                 ORDER BY p.created_at DESC
@@ -966,7 +969,6 @@ class Post {
                     SELECT gm.group_id
                     FROM group_members gm
                     WHERE gm.user_id = $1
-                    AND gm.status = 'active'
                     AND gm.is_banned = false
                 ),
                 interest_groups AS (
