@@ -49,6 +49,11 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
+              <img
+                src="/gossip-logo.svg"
+                alt="Gossip logo"
+                className="h-8 w-8 rounded-lg object-cover mr-2"
+              />
               <h1 className="text-2xl font-bold text-[#1D232E]">Gossip</h1>
             </Link>
 

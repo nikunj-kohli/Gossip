@@ -605,6 +605,10 @@ export const uploadInboxAttachment = async (file, userId) => {
   }
 };
 
+export const uploadPostMedia = async (file) => {
+  return uploadInboxAttachment(file);
+};
+
 // Search users
 export const searchUsers = async (query) => {
   try {

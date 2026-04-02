@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { getUserProfile, checkMessagingAccessStatus, startInboxConversation, createPost, getUserPosts, getPostById, toggleLike, updatePost, deletePost, sendMessageRequest } from '../api';
+import { getUserProfile, checkMessagingAccessStatus, startInboxConversation, createPost, getUserPosts, getPostById, toggleLike, updatePost, deletePost, sendMessageRequest, uploadPostMedia } from '../api';
 
 const ProfilePage = () => {
   const { username } = useParams();
@@ -17,6 +17,7 @@ const ProfilePage = () => {
   const [editingPost, setEditingPost] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [mediaFiles, setMediaFiles] = useState([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -90,17 +91,46 @@ const ProfilePage = () => {
     }
   };
 
+  const extractMediaFromContent = (content = '') => {
+    const urlRegex = /https?:\/\/[^\s]+/gi;
+    const urls = String(content).match(urlRegex) || [];
+    const imageRegex = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
+    const videoRegex = /\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i;
+
+    const images = urls.filter((url) => imageRegex.test(url) || /\/image\/upload\//i.test(url));
+    const videos = urls.filter((url) => videoRegex.test(url) || /\/video\/upload\//i.test(url));
+    const nonMediaUrls = new Set([...images, ...videos]);
+    const text = String(content)
+      .replace(urlRegex, (url) => (nonMediaUrls.has(url) ? '' : url))
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return { text, images, videos };
+  };
+
   const handleCreatePost = async (e) => {
     e.preventDefault();
-    if (!newPost.trim()) return;
+    if (!newPost.trim() && mediaFiles.length === 0) return;
 
     setIsSubmitting(true);
     try {
+      const uploadedMedia = [];
+      for (const file of mediaFiles) {
+        const { data, error: uploadError } = await uploadPostMedia(file);
+        if (uploadError || !data?.url) {
+          alert(uploadError?.response?.data?.message || uploadError?.message || 'Failed to upload media');
+          return;
+        }
+        uploadedMedia.push(data.url);
+      }
+
+      const normalizedContent = [newPost.trim(), ...uploadedMedia].filter(Boolean).join('\n');
+
       const { data, error } = await createPost({
-        content: newPost,
+        content: normalizedContent,
         visibility: 'public',
         isAnonymous: isAnonymous,
-        postType: 'text'
+        postType: uploadedMedia.length > 0 ? 'media' : 'text'
       });
       
       if (error) {
@@ -117,6 +147,7 @@ const ProfilePage = () => {
         setPosts(prevPosts => [data, ...prevPosts]);
         setNewPost('');
         setIsAnonymous(false);
+        setMediaFiles([]);
       } else {
         console.error('Invalid post data returned:', data);
         alert('Post created but data is invalid. Please refresh the page.');
@@ -435,10 +466,22 @@ const ProfilePage = () => {
                     <textarea
                       value={newPost}
                       onChange={(e) => setNewPost(e.target.value)}
-                      placeholder="What's on your mind?"
+                      placeholder="What's on your mind? Add text or attach photos/videos."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                       rows="3"
                     />
+                    <div className="mt-2">
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        onChange={(e) => setMediaFiles(Array.from(e.target.files || []).slice(0, 4))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      {mediaFiles.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">{mediaFiles.length} file(s) selected</p>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between mt-3">
                       <div className="flex items-center space-x-4">
                         <label className="flex items-center space-x-2 text-sm text-gray-600">
@@ -453,7 +496,7 @@ const ProfilePage = () => {
                       </div>
                       <button
                         type="submit"
-                        disabled={!newPost.trim() || isSubmitting}
+                        disabled={(!newPost.trim() && mediaFiles.length === 0) || isSubmitting}
                         className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md text-sm font-medium disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? 'Posting...' : 'Post'}
@@ -476,7 +519,9 @@ const ProfilePage = () => {
                   </p>
                 </div>
               ) : (
-                posts.map((post) => (
+                posts.map((post) => {
+                  const media = extractMediaFromContent(post.content);
+                  return (
                   <div key={post.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -526,9 +571,23 @@ const ProfilePage = () => {
                               </div>
                             </div>
                           ) : (
-                            post.content
+                            media.text
                           )}
                         </div>
+                        {editingPost !== post.id && media.images.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                            {media.images.map((url, idx) => (
+                              <img key={`${post.id}-img-${idx}`} src={url} alt="Post media" className="w-full rounded-lg border object-cover" />
+                            ))}
+                          </div>
+                        )}
+                        {editingPost !== post.id && media.videos.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {media.videos.map((url, idx) => (
+                              <video key={`${post.id}-vid-${idx}`} src={url} controls className="w-full rounded-lg border" preload="metadata" />
+                            ))}
+                          </div>
+                        )}
                         
                         <div className="flex items-center space-x-4">
                           <button
@@ -573,7 +632,8 @@ const ProfilePage = () => {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

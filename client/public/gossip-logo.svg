@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Gossip logo">
+  <rect width="128" height="128" rx="24" fill="#f6f0e5"/>
+  <path d="M18 22c0-7.73 6.27-14 14-14h64c7.73 0 14 6.27 14 14v44c0 7.73-6.27 14-14 14H62L43 97a4 4 0 0 1-6.86-2.83V80H32c-7.73 0-14-6.27-14-14V22z" fill="#E4572E"/>
+  <circle cx="44" cy="44" r="9" fill="#fff"/>
+  <circle cx="74" cy="44" r="9" fill="#fff"/>
+  <circle cx="61" cy="62" r="8" fill="#2f80a3"/>
+  <rect x="49" y="40" width="20" height="8" rx="4" fill="#fff"/>
+  <rect x="52" y="50" width="16" height="7" rx="3.5" transform="rotate(24 60 53.5)" fill="#fff"/>
+</svg>

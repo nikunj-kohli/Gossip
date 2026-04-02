@@ -11,16 +11,15 @@ const FeedPage = () => {
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [feedMode, setFeedMode] = useState('hybrid');
-  const [sortBy, setSortBy] = useState('hot');
+  const [sortBy, setSortBy] = useState('new');
   const [editingPost, setEditingPost] = useState(null);
   const [editContent, setEditContent] = useState('');
   const lastFetchTimeRef = useRef(0);
 
   const sortOptions = [
-    { id: 'hot', name: '🔥 Hot' },
     { id: 'new', name: '🆕 New' },
+    { id: 'old', name: '🕰️ Old' },
     { id: 'top', name: '🏆 Top' },
-    { id: 'rising', name: '📈 Rising' }
   ];
 
   useEffect(() => {
@@ -69,10 +68,7 @@ const FeedPage = () => {
       // TODO: Add category filtering when backend supports it
       // For now, don't filter by category since backend doesn't return category field
       
-      // Keep backend order for default feed to preserve random community sampling.
-      if (sortBy !== 'hot') {
-        filteredPosts = sortPosts(filteredPosts, sortBy);
-      }
+      filteredPosts = sortPosts(filteredPosts, sortBy);
       
       setPosts(filteredPosts);
     } catch (err) {
@@ -92,18 +88,12 @@ const FeedPage = () => {
     
     const sorted = [...posts];
     switch (sortType) {
-      case 'hot':
-        return sorted.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
       case 'new':
         return sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      case 'old':
+        return sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       case 'top':
         return sorted.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
-      case 'rising':
-        return sorted.sort((a, b) => {
-          const aScore = (a.likes_count || 0) * 0.5 + (a.comments_count || 0) * 0.3;
-          const bScore = (b.likes_count || 0) * 0.5 + (b.comments_count || 0) * 0.3;
-          return bScore - aScore;
-        });
       default:
         return sorted;
     }

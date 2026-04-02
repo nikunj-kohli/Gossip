@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from "../contexts/AuthContext";
-import { getPosts, createPost, getUserMemberships, getPostById } from '../api';
+import { getPosts, createPost, getUserMemberships, getPostById, uploadPostMedia } from '../api';
 
 const CommonWall = () => {
   const { user } = useContext(AuthContext);
@@ -15,6 +15,7 @@ const CommonWall = () => {
   const [userCommunities, setUserCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mediaFiles, setMediaFiles] = useState([]);
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -78,9 +79,26 @@ const CommonWall = () => {
     }
   };
 
+  const extractMediaFromContent = (content = '') => {
+    const urlRegex = /https?:\/\/[^\s]+/gi;
+    const urls = String(content).match(urlRegex) || [];
+    const imageRegex = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
+    const videoRegex = /\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i;
+
+    const images = urls.filter((url) => imageRegex.test(url) || /\/image\/upload\//i.test(url));
+    const videos = urls.filter((url) => videoRegex.test(url) || /\/video\/upload\//i.test(url));
+    const nonMediaUrls = new Set([...images, ...videos]);
+    const text = String(content)
+      .replace(urlRegex, (url) => (nonMediaUrls.has(url) ? '' : url))
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return { text, images, videos };
+  };
+
   const handleCreatePost = async () => {
-    if (!newPost.trim()) {
-      alert('Please write something in your post');
+    if (!newPost.trim() && mediaFiles.length === 0) {
+      alert('Please write something or attach media');
       return;
     }
 
@@ -100,9 +118,22 @@ const CommonWall = () => {
         return;
       }
 
+      const uploadedMedia = [];
+      for (const file of mediaFiles) {
+        const { data, error } = await uploadPostMedia(file);
+        if (error || !data?.url) {
+          alert(error?.response?.data?.message || error?.message || 'Failed to upload media');
+          setIsSubmitting(false);
+          return;
+        }
+        uploadedMedia.push(data.url);
+      }
+
+      const normalizedContent = [newPost.trim(), ...uploadedMedia].filter(Boolean).join('\n');
+
       const postPayload = {
-        content: newPost,
-        postType: postType,
+        content: normalizedContent,
+        postType: uploadedMedia.length > 0 ? 'media' : postType,
         isAnonymous: isAnonymous,
         visibility: 'public'
       };
@@ -125,6 +156,7 @@ const CommonWall = () => {
       setNewPost('');
       setPostType('text');
       setIsAnonymous(false);
+      setMediaFiles([]);
       setPostMode('no-community');
       setSelectedCommunity(null);
       await fetchPosts();
@@ -212,10 +244,24 @@ const CommonWall = () => {
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
-                placeholder="What's on your mind?"
+                placeholder="What's on your mind? Add text or attach photos/videos."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Attach media (optional)</label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={(e) => setMediaFiles(Array.from(e.target.files || []).slice(0, 4))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                {mediaFiles.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">{mediaFiles.length} file(s) selected</p>
+                )}
+              </div>
 
               {/* Anonymity Toggle */}
               <div className="flex items-center space-x-2">
@@ -334,7 +380,9 @@ const CommonWall = () => {
               <p className="text-gray-500">No posts yet. Be the first to share something!</p>
             </div>
           ) : (
-            posts.map((post) => (
+            posts.map((post) => {
+              const media = extractMediaFromContent(post.content);
+              return (
               <div key={post.id} className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-start space-x-3">
                   <img
@@ -370,8 +418,22 @@ const CommonWall = () => {
                       )}
                     </div>
                     <div className="text-gray-800 mb-3">
-                      {post.content}
+                      {media.text}
                     </div>
+                    {media.images.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                        {media.images.map((url, idx) => (
+                          <img key={`${post.id}-img-${idx}`} src={url} alt="Post media" className="w-full rounded-lg border object-cover" />
+                        ))}
+                      </div>
+                    )}
+                    {media.videos.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {media.videos.map((url, idx) => (
+                          <video key={`${post.id}-vid-${idx}`} src={url} controls className="w-full rounded-lg border" preload="metadata" />
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                       <button className="hover:text-blue-600 transition">
                         👍 {post.likes_count || 0}
@@ -389,7 +451,8 @@ const CommonWall = () => {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
