@@ -7,6 +7,11 @@ const handlebars = require('handlebars');
 // Create transporter
 let transporter;
 
+const isSendGridApiConfig = () =>
+  config.email.host === 'smtp.sendgrid.net'
+  && config.email.auth?.user === 'apikey'
+  && Boolean(config.email.auth?.pass);
+
 const buildTransportOptions = ({ host, port, secure, user, pass }) => ({
   host,
   port,
@@ -70,6 +75,42 @@ const loadTemplate = (templateName) => {
   return template;
 };
 
+const sendViaSendGridApi = async ({ to, subject, html, from }) => {
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.email.auth.pass}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: {
+        email: from,
+        name: config.appName,
+      },
+      subject,
+      content: [{ type: 'text/html', value: html }],
+    }),
+  });
+
+  if (!response.ok) {
+    let responseBody = '';
+    try {
+      responseBody = await response.text();
+    } catch (error) {
+      responseBody = '';
+    }
+
+    const error = new Error(`SendGrid API request failed with status ${response.status}`);
+    error.code = 'EMAIL_SEND_FAILED';
+    error.status = response.status;
+    error.details = responseBody;
+    throw error;
+  }
+
+  return { messageId: `sendgrid-${Date.now()}` };
+};
+
 // Send email
 const sendEmail = async (to, subject, templateName, context = {}) => {
   try {
@@ -93,19 +134,31 @@ const sendEmail = async (to, subject, templateName, context = {}) => {
     // Compile template
     const template = loadTemplate(templateName);
     const html = template(fullContext);
-    
-    // Send email
-    const result = await transporter.sendMail({
-      from: `"${config.appName}" <${config.email.from}>`,
-      to,
-      subject,
-      html
-    });
+
+    // Send email through SendGrid API when configured for SendGrid.
+    const result = isSendGridApiConfig()
+      ? await sendViaSendGridApi({
+        to,
+        subject,
+        html,
+        from: config.email.from,
+      })
+      : await transporter.sendMail({
+        from: `"${config.appName}" <${config.email.from}>`,
+        to,
+        subject,
+        html
+      });
     
     console.log(`Email sent to ${to}: ${result.messageId}`);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email:', {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+      details: error.details,
+    });
     return {
       success: false,
       code: error.code || 'EMAIL_SEND_FAILED',
