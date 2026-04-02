@@ -51,6 +51,21 @@ class User{
     static async verifyPassword(plainPassword, hashedPassword){
         return await bcrypt.compare(plainPassword, hashedPassword);
     }
+
+    // Update password by email
+    static async updatePasswordByEmail(email, password) {
+        const passwordHash = await bcrypt.hash(password, 10);
+        const query = `
+          UPDATE users
+          SET password_hash = $1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE LOWER(email) = LOWER($2)
+          RETURNING id, username, email
+        `;
+
+        const result = await db.query(query, [passwordHash, email]);
+        return result.rows[0] || null;
+    }
 }
 
 module.exports = User;

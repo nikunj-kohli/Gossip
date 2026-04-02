@@ -108,6 +108,20 @@ const sendPasswordResetEmail = async (user, resetToken) => {
   );
 };
 
+// Send password reset OTP email
+const sendPasswordOtpEmail = async (user, otp) => {
+  return sendEmail(
+    user.email,
+    `Your ${config.appName} password reset OTP`,
+    'password-reset-otp',
+    {
+      username: user.username,
+      displayName: user.display_name || user.username,
+      otp
+    }
+  );
+};
+
 // Send verification email
 const sendVerificationEmail = async (user) => {
   return sendEmail(
@@ -202,6 +216,7 @@ module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendPasswordOtpEmail,
   sendVerificationEmail,
   sendNotificationEmail
 };

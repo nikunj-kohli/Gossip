@@ -9,6 +9,7 @@ import Navbar from './components/Navbar';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import FeedPage from './pages/FeedPage';
 import FriendsPage from './pages/FriendsPage';
 import MessagesPage from './pages/MessagesPage';
@@ -41,6 +42,11 @@ function App() {
             <Route path="/register" element={
               <RedirectAuth>
                 <RegisterPage />
+              </RedirectAuth>
+            } />
+            <Route path="/forgot-password" element={
+              <RedirectAuth>
+                <ForgotPasswordPage />
               </RedirectAuth>
             } />
             
