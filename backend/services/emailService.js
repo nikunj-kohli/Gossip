@@ -7,29 +7,50 @@ const handlebars = require('handlebars');
 // Create transporter
 let transporter;
 
+const buildTransportOptions = ({ host, port, secure, user, pass }) => ({
+  host,
+  port,
+  secure,
+  auth: user || pass ? { user, pass } : undefined,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+});
+
+const missingEmailConfig = () => {
+  if (process.env.NODE_ENV === 'production') {
+    if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass) {
+      return 'EMAIL_CONFIG_MISSING';
+    }
+    return null;
+  }
+
+  // In non-production, allow either dev creds or prod creds.
+  const hasDev = Boolean(config.email.devHost && config.email.devAuth?.user && config.email.devAuth?.pass);
+  const hasProd = Boolean(config.email.host && config.email.auth?.user && config.email.auth?.pass);
+  return hasDev || hasProd ? null : 'EMAIL_CONFIG_MISSING';
+};
+
 // Initialize different transporters based on environment
 if (process.env.NODE_ENV === 'production') {
   // Production transporter (e.g., SendGrid, AWS SES, etc.)
-  transporter = nodemailer.createTransport({
+  transporter = nodemailer.createTransport(buildTransportOptions({
     host: config.email.host,
     port: config.email.port,
     secure: config.email.secure,
-    auth: {
-      user: config.email.auth.user,
-      pass: config.email.auth.pass
-    }
-  });
+    user: config.email.auth.user,
+    pass: config.email.auth.pass,
+  }));
 } else {
   // Development transporter (e.g., Ethereal, Mailtrap, etc.)
-  transporter = nodemailer.createTransport({
-    host: config.email.devHost,
-    port: config.email.devPort,
-    secure: config.email.devSecure,
-    auth: {
-      user: config.email.devAuth.user,
-      pass: config.email.devAuth.pass
-    }
-  });
+  const useDevCreds = Boolean(config.email.devAuth?.user && config.email.devAuth?.pass);
+  transporter = nodemailer.createTransport(buildTransportOptions({
+    host: useDevCreds ? config.email.devHost : config.email.host,
+    port: useDevCreds ? config.email.devPort : config.email.port,
+    secure: useDevCreds ? config.email.devSecure : config.email.secure,
+    user: useDevCreds ? config.email.devAuth.user : config.email.auth.user,
+    pass: useDevCreds ? config.email.devAuth.pass : config.email.auth.pass,
+  }));
 }
 
 // Cache for compiled templates
@@ -52,6 +73,15 @@ const loadTemplate = (templateName) => {
 // Send email
 const sendEmail = async (to, subject, templateName, context = {}) => {
   try {
+    const configError = missingEmailConfig();
+    if (configError) {
+      return {
+        success: false,
+        code: configError,
+        error: new Error('Email service is not configured'),
+      };
+    }
+
     // Add common variables to context
     const fullContext = {
       ...context,
@@ -76,7 +106,11 @@ const sendEmail = async (to, subject, templateName, context = {}) => {
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending email:', error);
-    return { success: false, error };
+    return {
+      success: false,
+      code: error.code || 'EMAIL_SEND_FAILED',
+      error,
+    };
   }
 };
 

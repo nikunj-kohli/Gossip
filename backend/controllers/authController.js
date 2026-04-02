@@ -163,7 +163,10 @@ const sendForgotPasswordOtp = async (req, res) => {
 
         if (!mailResult.success) {
             clearOtp(email);
-            return res.status(500).json({ message: 'Failed to send OTP email' });
+            const message = mailResult.code === 'EMAIL_CONFIG_MISSING'
+                ? 'Email service is not configured on server. Please contact support.'
+                : 'Failed to send OTP email';
+            return res.status(500).json({ message });
         }
 
         return res.json({
