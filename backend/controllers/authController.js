@@ -3,6 +3,7 @@ const { generateToken } = require('../utils/jwt');
 const {
     canResendOtp,
     createOtp,
+    clearOtp,
     verifyOtp,
     consumeResetToken,
     normalizeEmail,
@@ -153,9 +154,15 @@ const sendForgotPasswordOtp = async (req, res) => {
         }
 
         const { otp, expiresInSeconds } = createOtp(email);
-        const mailResult = await sendPasswordOtpEmail(user, otp);
+        const mailResult = await Promise.race([
+            sendPasswordOtpEmail(user, otp),
+            new Promise((resolve) => {
+                setTimeout(() => resolve({ success: false, timeout: true }), 10000);
+            }),
+        ]);
 
         if (!mailResult.success) {
+            clearOtp(email);
             return res.status(500).json({ message: 'Failed to send OTP email' });
         }
 

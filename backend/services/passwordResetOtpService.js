@@ -67,6 +67,11 @@ const createOtp = (email) => {
   };
 };
 
+const clearOtp = (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  otpStore.delete(normalizedEmail);
+};
+
 const verifyOtp = (email, otp) => {
   const normalizedEmail = normalizeEmail(email);
   const record = otpStore.get(normalizedEmail);
@@ -131,6 +136,7 @@ const consumeResetToken = (email, resetToken) => {
 module.exports = {
   canResendOtp,
   createOtp,
+  clearOtp,
   verifyOtp,
   consumeResetToken,
   normalizeEmail,
