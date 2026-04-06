@@ -76,13 +76,55 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const normalizeOrigin = (value) => {
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch (error) {
+    return value;
+  }
+};
+
+const originMatchesRule = (origin, rule) => {
+  if (!origin || !rule) return false;
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  const normalizedRule = normalizeOrigin(rule);
+
+  if (normalizedOrigin === normalizedRule) {
+    return true;
+  }
+
+  // Wildcard subdomain support: https://*.example.pages.dev
+  const wildcardMatch = normalizedRule.match(/^(https?:\/\/)\*\.(.+)$/i);
+  if (!wildcardMatch) {
+    return false;
+  }
+
+  const [, protocol, baseHost] = wildcardMatch;
+
+  try {
+    const parsedOrigin = new URL(normalizedOrigin);
+    if (`${parsedOrigin.protocol}//` !== protocol) {
+      return false;
+    }
+
+    return parsedOrigin.hostname === baseHost || parsedOrigin.hostname.endsWith(`.${baseHost}`);
+  } catch (error) {
+    return false;
+  }
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    const isAllowed = allowedOrigins.length === 0
+      || allowedOrigins.some((rule) => originMatchesRule(origin, rule));
+
+    if (isAllowed) {
       return callback(null, true);
     }
 
