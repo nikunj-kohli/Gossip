@@ -506,7 +506,12 @@ const MessagesPage = () => {
         <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-800">Messages</h2>
-            <button onClick={() => setShowStartModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm">Start</button>
+            <button
+              onClick={() => setShowStartModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-sm transition-colors"
+            >
+              Start
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -577,12 +582,12 @@ const MessagesPage = () => {
                   const media = normalizeMediaContent(m.content);
                   return (
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`${mine ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} max-w-lg px-4 py-2 rounded-lg`}>
+                      <div className={`${mine ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} max-w-lg px-4 py-2 rounded-2xl shadow-sm`}>
                         {mine && !String(m.id).startsWith('tmp-') && m.content !== '[Message deleted]' && (
-                          <div className="text-right mb-1">
+                          <div className="flex justify-end mb-1">
                             <button
                               onClick={() => onDeleteMessage(m.id)}
-                              className={`text-[10px] underline ${mine ? 'text-blue-100' : 'text-gray-600'}`}
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium transition ${mine ? 'bg-blue-500/60 text-blue-50 hover:bg-blue-500/80' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
                             >
                               Delete for everyone
                             </button>
@@ -629,7 +634,18 @@ const MessagesPage = () => {
                                 {(() => {
                                   const mimeType = (a.mimeType || a.type || '').toLowerCase();
                                   const isImage = mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(a.url || '');
-                                  if (!isImage) return null;
+                                  if (!isImage) {
+                                    return (
+                                      <a
+                                        href={a.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`inline-flex text-xs underline ${mine ? 'text-blue-100' : 'text-blue-700'}`}
+                                      >
+                                        Open attachment
+                                      </a>
+                                    );
+                                  }
                                   return (
                                     <img
                                       src={a.url}
@@ -639,14 +655,6 @@ const MessagesPage = () => {
                                     />
                                   );
                                 })()}
-                                <a
-                                  href={a.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className={`block text-xs underline ${mine ? 'text-blue-100' : 'text-blue-700'}`}
-                                >
-                                  {a.name || 'Attachment'}
-                                </a>
                               </div>
                             ))}
                           </div>
@@ -684,14 +692,14 @@ const MessagesPage = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 rounded-full border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+                  className="px-5 py-2.5 rounded-full border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Add media
                 </button>
                 <button
                   onClick={onSend}
                   disabled={isSending}
-                  className={`px-4 py-2 rounded-full text-white ${isSending ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  className={`px-6 py-2.5 rounded-full text-white text-sm font-semibold shadow-sm transition-colors ${isSending ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
                   {isSending ? 'Sending...' : 'Send'}
                 </button>
