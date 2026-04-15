@@ -11,6 +11,7 @@ import {
   uploadInboxAttachment,
 } from '../api';
 import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
+import { getMessagePreviewLabel, normalizeMediaContent } from '../utils/mediaContent';
 
 const MessagesPage = () => {
   const { conversationId } = useParams();
@@ -191,7 +192,7 @@ const MessagesPage = () => {
         if (idx >= 0) {
           next[idx] = {
             ...next[idx],
-            last_message: incoming.content,
+            last_message: getMessagePreviewLabel(incoming),
             last_message_at: incoming.created_at || new Date().toISOString(),
           };
           return next.sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0));
@@ -515,6 +516,7 @@ const MessagesPage = () => {
               conversations.map((conversation) => {
                 const participant = conversation.participants?.[0];
                 const displayName = participant?.display_name || participant?.username || 'Unknown';
+                const previewText = conversation.last_message || 'No messages yet';
                 return (
                   <button
                     key={conversation.id}
@@ -525,7 +527,7 @@ const MessagesPage = () => {
                     className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 ${parseInt(selectedConversation?.id, 10) === parseInt(conversation.id, 10) ? 'bg-blue-50' : ''}`}
                   >
                     <div className="font-medium text-gray-900">{displayName}</div>
-                    <div className="text-sm text-gray-500 truncate">{conversation.last_message || 'No messages yet'}</div>
+                    <div className="text-sm text-gray-500 truncate">{previewText}</div>
                   </button>
                 );
               })
@@ -552,6 +554,7 @@ const MessagesPage = () => {
                 <div ref={messagesStartRef} />
                 {messages.map((m) => {
                   const mine = parseInt(m.sender_id, 10) === parseInt(user?.id, 10);
+                  const media = normalizeMediaContent(m.content);
                   return (
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                       <div className={`${mine ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} max-w-lg px-4 py-2 rounded-lg`}>
@@ -565,7 +568,40 @@ const MessagesPage = () => {
                             </button>
                           </div>
                         )}
-                        <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                        {m.content !== '[Message deleted]' && (
+                          <div className="space-y-2">
+                            {media.text && <p className="text-sm whitespace-pre-wrap">{media.text}</p>}
+                            {media.images.length > 0 && (
+                              <div className="space-y-2">
+                                {media.images.map((url, idx) => (
+                                  <img
+                                    key={`${m.id}-media-img-${idx}`}
+                                    src={url}
+                                    alt={m.attachments?.[idx]?.name || 'attachment'}
+                                    className="max-w-xs max-h-52 rounded-md border border-black/10"
+                                    loading="lazy"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {media.videos.length > 0 && (
+                              <div className="space-y-2">
+                                {media.videos.map((url, idx) => (
+                                  <video
+                                    key={`${m.id}-media-vid-${idx}`}
+                                    src={url}
+                                    controls
+                                    className="max-w-xs rounded-md border border-black/10"
+                                    preload="metadata"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {m.content === '[Message deleted]' && (
+                          <p className="text-sm italic opacity-80">Message deleted</p>
+                        )}
                         {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {m.attachments.map((a, idx) => (
@@ -630,7 +666,7 @@ const MessagesPage = () => {
                   onClick={() => fileInputRef.current?.click()}
                   className="px-4 py-2 rounded-full border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  Attach
+                  Add media
                 </button>
                 <button
                   onClick={onSend}

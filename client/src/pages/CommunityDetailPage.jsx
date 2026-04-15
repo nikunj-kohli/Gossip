@@ -15,6 +15,7 @@ import {
   warnCommunityPost,
 } from '../api';
 import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
+import { normalizeMediaContent } from '../utils/mediaContent';
 
 const CommunityDetailPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -470,12 +471,30 @@ const CommunityDetailPage = () => {
                             )}
                           </div>
                         </div>
-                        <p
-                          className="mt-3 text-gray-800 whitespace-pre-wrap cursor-pointer"
-                          onClick={() => handleOpenPostDetail(post)}
-                        >
-                          {post.content}
-                        </p>
+                        {(() => {
+                          const media = normalizeMediaContent(post.content);
+                          return (
+                            <div className="mt-3 space-y-3 cursor-pointer" onClick={() => handleOpenPostDetail(post)}>
+                              {media.text && (
+                                <p className="text-gray-800 whitespace-pre-wrap">{media.text}</p>
+                              )}
+                              {media.images.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {media.images.map((url, idx) => (
+                                    <img key={`${post.id}-img-${idx}`} src={url} alt="Post media" className="w-full rounded-lg border object-cover" loading="lazy" />
+                                  ))}
+                                </div>
+                              )}
+                              {media.videos.length > 0 && (
+                                <div className="space-y-2">
+                                  {media.videos.map((url, idx) => (
+                                    <video key={`${post.id}-vid-${idx}`} src={url} controls className="w-full rounded-lg border" preload="metadata" />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="mt-2 text-xs text-gray-500">
                           {(post.likes_count || 0)} likes · {(post.comments_count || 0)} comments
                         </div>

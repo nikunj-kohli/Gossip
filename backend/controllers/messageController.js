@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Friendship = require('../models/Friendship');
 const redis = require('../services/enhancedRedisService');
 const { MediaUploader } = require('../utils/mediaUploader');
+const { getMessagePreviewLabel } = require('../utils/messagePreview');
 
 const inboxCacheKey = {
     conversations: (userId) => `inbox:conversations:user:${userId}`,
@@ -276,7 +277,7 @@ exports.sendMessage = async (req, res) => {
                 conversationId: parseInt(conversationId),
                 participants: [conversation.user1_id, conversation.user2_id],
                 senderId: currentUserId,
-                last_message: content,
+                last_message: getMessagePreviewLabel(message),
                 last_message_at: message.created_at,
                 unread_count: 1 // Increment for other user
             };

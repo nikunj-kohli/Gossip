@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { getMessagePreviewLabel } = require('../utils/messagePreview');
 
 class Conversation {
     // Create a new conversation between users
@@ -191,9 +192,23 @@ class Conversation {
                         SELECT m.content
                         FROM messages m
                         WHERE m.conversation_id = c.id
-                        ORDER BY m.created_at DESC
+                        ORDER BY m.created_at DESC, m.id DESC
                         LIMIT 1
-                    ) as last_message
+                    ) as last_message_content,
+                    (
+                        SELECT m.message_type
+                        FROM messages m
+                        WHERE m.conversation_id = c.id
+                        ORDER BY m.created_at DESC, m.id DESC
+                        LIMIT 1
+                    ) as last_message_type,
+                    (
+                        SELECT m.attachments
+                        FROM messages m
+                        WHERE m.conversation_id = c.id
+                        ORDER BY m.created_at DESC, m.id DESC
+                        LIMIT 1
+                    ) as last_message_attachments
                 FROM 
                     conversations c
                 WHERE 
@@ -223,6 +238,11 @@ class Conversation {
                 const participantsResult = await db.query(participantsQuery, [otherUserId]);
                 
                 conversation.participants = participantsResult.rows;
+                conversation.last_message = getMessagePreviewLabel({
+                    content: conversation.last_message_content,
+                    message_type: conversation.last_message_type,
+                    attachments: conversation.last_message_attachments,
+                });
                 conversations.push(conversation);
             }
             

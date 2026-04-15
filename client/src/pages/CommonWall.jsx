@@ -2,13 +2,13 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from "../contexts/AuthContext";
 import { getPosts, createPost, getUserMemberships, getPostById, uploadPostMedia } from '../api';
+import { normalizeMediaContent } from '../utils/mediaContent';
 
 const CommonWall = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
-  const [postType, setPostType] = useState('text');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [postMode, setPostMode] = useState('no-community'); // 'no-community' or 'community'
   const [selectedCommunity, setSelectedCommunity] = useState(null);
@@ -79,23 +79,6 @@ const CommonWall = () => {
     }
   };
 
-  const extractMediaFromContent = (content = '') => {
-    const urlRegex = /https?:\/\/[^\s]+/gi;
-    const urls = String(content).match(urlRegex) || [];
-    const imageRegex = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
-    const videoRegex = /\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i;
-
-    const images = urls.filter((url) => imageRegex.test(url) || /\/image\/upload\//i.test(url));
-    const videos = urls.filter((url) => videoRegex.test(url) || /\/video\/upload\//i.test(url));
-    const nonMediaUrls = new Set([...images, ...videos]);
-    const text = String(content)
-      .replace(urlRegex, (url) => (nonMediaUrls.has(url) ? '' : url))
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-    return { text, images, videos };
-  };
-
   const handleCreatePost = async () => {
     if (!newPost.trim() && mediaFiles.length === 0) {
       alert('Please write something or attach media');
@@ -133,7 +116,6 @@ const CommonWall = () => {
 
       const postPayload = {
         content: normalizedContent,
-        postType: uploadedMedia.length > 0 ? 'media' : postType,
         isAnonymous: isAnonymous,
         visibility: 'public'
       };
@@ -154,7 +136,6 @@ const CommonWall = () => {
 
       // Clear input and refresh posts
       setNewPost('');
-      setPostType('text');
       setIsAnonymous(false);
       setMediaFiles([]);
       setPostMode('no-community');
@@ -218,145 +199,138 @@ const CommonWall = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto p-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Wall</h1>
+        <div className="mb-6 rounded-3xl border border-white/70 bg-gradient-to-br from-[#f7f1e8] via-white to-[#eef4ff] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <h1 className="text-3xl font-bold text-gray-900">Wall</h1>
+          <p className="mt-2 max-w-2xl text-sm text-gray-600">
+            Share a thought, drop a link, or attach media without switching post modes.
+          </p>
+        </div>
         
         {/* Create Post Section */}
         {user ? (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Create a Post</h2>
-            <div className="space-y-4">
-              {/* Post Type Selection */}
-              <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600">Type:</label>
-                <select
-                  value={postType}
-                  onChange={(e) => setPostType(e.target.value)}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="text">📝 Text</option>
-                  <option value="media">📷 Media</option>
-                  <option value="poll">📊 Poll</option>
-                  <option value="link">🔗 Link</option>
-                </select>
-              </div>
-
-              {/* Post Content */}
+          <div className="mb-6 overflow-hidden rounded-3xl border border-[#e9e2d6] bg-white shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+            <div className="border-b border-[#efe9de] bg-gradient-to-r from-[#fffaf3] to-white px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">Create a post</h2>
+              <p className="text-sm text-gray-600">Keep it simple. Text is optional, media is optional.</p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="What's on your mind? Add text or attach photos/videos."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={3}
+                className="min-h-[120px] w-full resize-none rounded-2xl border border-[#d9d1c4] bg-[#fcfbf8] px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={4}
               />
 
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Attach media (optional)</label>
+              <div className="rounded-2xl border border-dashed border-[#d9d1c4] bg-[#faf7f0] px-4 py-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add media</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
                   multiple
                   onChange={(e) => setMediaFiles(Array.from(e.target.files || []).slice(0, 4))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-full file:border-0 file:bg-gray-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-gray-800"
                 />
                 {mediaFiles.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">{mediaFiles.length} file(s) selected</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {mediaFiles.map((file) => (
+                      <span key={`${file.name}-${file.size}`} className="rounded-full bg-white px-3 py-1 text-xs text-gray-700 border border-[#e5ddd0]">
+                        {file.name}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {/* Anonymity Toggle */}
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="anonymousToggle"
-                  checked={isAnonymous}
-                  onChange={(e) => setIsAnonymous(e.target.checked)}
-                  className="w-4 h-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                />
-                <label htmlFor="anonymousToggle" className="text-sm text-gray-600 cursor-pointer">
-                  📛 Post Anonymously
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    id="anonymousToggle"
+                    checked={isAnonymous}
+                    onChange={(e) => setIsAnonymous(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Post anonymously
                 </label>
+                <button
+                  onClick={handleCreatePost}
+                  disabled={isSubmitting}
+                  className={`inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold text-white transition ${
+                    isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {isSubmitting ? 'Posting...' : 'Publish'}
+                </button>
               </div>
 
-              {/* Community Selection */}
-              <div className="space-y-2">
-                <label className="text-sm text-gray-600">Post To:</label>
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="postMode"
-                      value="no-community"
-                      checked={postMode === 'no-community'}
+              <div className="rounded-2xl border border-[#ebe4d9] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Destination</p>
+                    <p className="text-xs text-gray-500">Choose either the global wall or a community.</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="postMode"
+                        value="no-community"
+                        checked={postMode === 'no-community'}
+                        onChange={(e) => {
+                          setPostMode(e.target.value);
+                          setSelectedCommunity(null);
+                        }}
+                        className="h-4 w-4"
+                      />
+                      Wall
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="postMode"
+                        value="community"
+                        checked={postMode === 'community'}
+                        onChange={(e) => setPostMode(e.target.value)}
+                        className="h-4 w-4"
+                      />
+                      Community
+                    </label>
+                  </div>
+                </div>
+
+                {postMode === 'community' && (
+                  <div className="mt-4">
+                    <select
+                      value={selectedCommunity?.id || selectedCommunity?.group_id || ''}
                       onChange={(e) => {
-                        setPostMode(e.target.value);
-                        setSelectedCommunity(null);
+                        const communityId = parseInt(e.target.value);
+                        const selected = userCommunities.find((c) => (c.id || c.group_id) === communityId);
+                        setSelectedCommunity(selected || null);
                       }}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <span className="ml-2 text-sm text-gray-600 cursor-pointer">No Community</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="postMode"
-                      value="community"
-                      checked={postMode === 'community'}
-                      onChange={(e) => setPostMode(e.target.value)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <span className="ml-2 text-sm text-gray-600 cursor-pointer">Select Community</span>
-                  </label>
-                </div>
+                      className="w-full rounded-xl border border-[#d9d1c4] bg-[#fcfbf8] px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Select a Community --</option>
+                      {userCommunities.map((community) => (
+                        <option key={community.id || community.group_id} value={community.id || community.group_id}>
+                          {community.name || community.group_name || 'Unnamed'}
+                        </option>
+                      ))}
+                    </select>
+                    {userCommunities.length === 0 && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        You haven't joined any communities yet. <a href="/communities" className="text-blue-600 hover:underline">Browse communities</a>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {postMode === 'community' && selectedCommunity && (
+                  <div className="mt-4 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                    Posting to {selectedCommunity.name || selectedCommunity.group_name || 'this community'}
+                  </div>
+                )}
               </div>
-
-              {/* Community Dropdown */}
-              {postMode === 'community' && (
-                <div>
-                  <select
-                    value={selectedCommunity?.id || selectedCommunity?.group_id || ''}
-                    onChange={(e) => {
-                      const communityId = parseInt(e.target.value);
-                      const selected = userCommunities.find(c => (c.id || c.group_id) === communityId);
-                      setSelectedCommunity(selected || null);
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">-- Select a Community --</option>
-                    {userCommunities.map((community) => (
-                      <option key={community.id || community.group_id} value={community.id || community.group_id}>
-                        {community.name || community.group_name || 'Unnamed'}
-                      </option>
-                    ))}
-                  </select>
-                  {userCommunities.length === 0 && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      You haven't joined any communities yet. <a href="/communities" className="text-blue-600 hover:underline">Browse communities</a>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Community Info */}
-              {postMode === 'community' && selectedCommunity && (
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    📍 <strong>Posting to:</strong> {selectedCommunity.name || selectedCommunity.group_name || 'This Community'}
-                  </p>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <button
-                onClick={handleCreatePost}
-                disabled={isSubmitting}
-                className={`w-full py-2 rounded-lg text-white font-medium transition ${
-                  isSubmitting
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {isSubmitting ? 'Posting...' : 'Post'}
-              </button>
             </div>
           </div>
         ) : (
@@ -381,7 +355,7 @@ const CommonWall = () => {
             </div>
           ) : (
             posts.map((post) => {
-              const media = extractMediaFromContent(post.content);
+              const media = normalizeMediaContent(post.content);
               return (
               <div key={post.id} className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-start space-x-3">
