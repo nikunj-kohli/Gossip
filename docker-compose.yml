@@ -10,7 +10,7 @@ services:
       PORT: 5000
       DB_SSL: "true"
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:5000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
@@ -37,7 +37,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "3000:80"
+      - "${CLIENT_PORT:-3000}:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
