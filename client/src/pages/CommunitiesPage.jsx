@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { getCommunities, joinCommunity, createCommunity, getUserMemberships } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const CommunitiesPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -11,6 +12,7 @@ const CommunitiesPage = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [createError, setCreateError] = useState('');
 
   const fetchCommunities = async () => {
     try {
@@ -153,8 +155,23 @@ const CommunitiesPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <SkeletonBlock className="h-8 w-40" />
+            <SkeletonBlock className="h-10 w-44 rounded-md" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <SkeletonCard avatar media lines={2} footer />
+              <SkeletonCard avatar media lines={2} footer />
+            </div>
+            <div className="space-y-4">
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={3} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -196,6 +213,7 @@ const CommunitiesPage = () => {
                         className="h-full w-full object-cover"
                         src={getCommunityCover(community)}
                         alt={`${community.name || 'Community'} cover`}
+                        loading="lazy"
                       />
                     </div>
                     <div className="p-4">
@@ -204,6 +222,7 @@ const CommunitiesPage = () => {
                           className="h-16 w-16 rounded-xl border border-[#d8d2c6]"
                           src={getCommunityAvatar(community)}
                           alt={community.name || 'Community'}
+                          loading="lazy"
                         />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
@@ -268,6 +287,7 @@ const CommunitiesPage = () => {
                           className="h-8 w-8 rounded"
                           src={membership.avatar_url || `https://ui-avatars.com/api/?name=${membership.group_name || 'community'}&background=0F766E&color=fff&size=32`}
                           alt={membership.group_name || 'Community'}
+                          loading="lazy"
                         />
                         <div>
                           <p className="text-sm font-medium text-gray-900">{membership.group_name || membership.name || 'Unknown'}</p>
@@ -320,11 +340,13 @@ const CommunitiesPage = () => {
           
           <form onSubmit={async (e) => {
             e.preventDefault();
+            setCreateError('');
             const formData = new FormData(e.target);
             const communityData = {
               name: formData.get('name'),
               description: formData.get('description'),
               privacy: formData.get('privacy') || 'public',
+              avatarUrl: formData.get('avatarUrl') || undefined,
               coverUrl: formData.get('coverUrl') || undefined,
             };
             
@@ -333,19 +355,28 @@ const CommunitiesPage = () => {
               
               if (error) {
                 console.error('Error creating community:', error);
-                alert(error.message || 'Failed to create community');
+                const message = error.response?.status === 409
+                  ? (error.response?.data?.message || 'A community with this name already exists. Try a different name.')
+                  : (error.response?.data?.message || error.message || 'Failed to create community');
+                setCreateError(message);
               } else {
                 alert('Community created successfully!');
                 setShowCreateModal(false);
+                setCreateError('');
                 await fetchCommunities(); // Refresh communities list
                 await fetchUserCommunities(); // Refresh user communities
               }
             } catch (error) {
               console.error('Error creating community:', error);
-              alert('Failed to create community');
+              setCreateError(error?.response?.data?.message || error.message || 'Failed to create community');
             }
           }}>
             <div className="space-y-4">
+              {createError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {createError}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Community Name</label>
                 <input
@@ -379,12 +410,23 @@ const CommunitiesPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL (recommended 1:1, e.g. 512 x 512)</label>
+                <input
+                  type="url"
+                  name="avatarUrl"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://..."
+                />
+                <p className="mt-1 text-xs text-gray-500">Square images work best for the community icon.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL (recommended 3:1, e.g. 1200 x 400)</label>
                 <input
                   type="url"
                   name="coverUrl"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Leave blank to auto-generate free cover"
+                  placeholder="Leave blank to auto-generate a free cover"
                 />
                 <p className="mt-1 text-xs text-gray-500">If blank, a free default cover is auto-generated based on community topic.</p>
               </div>

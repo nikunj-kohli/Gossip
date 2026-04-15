@@ -14,6 +14,7 @@ import {
   deletePost,
   warnCommunityPost,
 } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const CommunityDetailPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -318,8 +319,15 @@ const CommunityDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <SkeletonCard media lines={3} footer />
+          <div className="space-y-4">
+            <SkeletonBlock className="h-7 w-48" />
+            <SkeletonCard avatar lines={3} footer />
+            <SkeletonCard avatar lines={4} footer />
+          </div>
+        </div>
       </div>
     );
   }
@@ -345,7 +353,7 @@ const CommunityDetailPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="editorial-card overflow-hidden">
           <div className="h-56 w-full overflow-hidden">
-            <img className="h-full w-full object-cover" src={communityCover} alt={`${community.name} cover`} />
+            <img className="h-full w-full object-cover" src={communityCover} alt={`${community.name} cover`} loading="lazy" />
           </div>
           <div className="p-6">
             <div className="flex items-start justify-between">
@@ -354,6 +362,7 @@ const CommunityDetailPage = () => {
                   className="h-16 w-16 rounded-xl border border-[#d8d2c6]"
                   src={communityAvatar}
                   alt={community.name}
+                  loading="lazy"
                 />
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">c/{community.name}</h2>
@@ -420,7 +429,10 @@ const CommunityDetailPage = () => {
               )}
 
               {postsLoading ? (
-                <div className="text-center py-8 text-gray-500">Loading posts...</div>
+                <div className="space-y-4">
+                  <SkeletonCard avatar lines={3} footer />
+                  <SkeletonCard avatar lines={4} footer />
+                </div>
               ) : posts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No posts yet. Be the first to post.</div>
               ) : (

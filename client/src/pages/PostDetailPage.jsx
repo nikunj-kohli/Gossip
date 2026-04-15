@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { addPostComment, getPostById, getPostByPermalink, getPostComments, toggleCommentLike, toggleLike } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const PostDetailPage = () => {
   const { communitySlug, headline, dateAndToken, legacyId } = useParams();
@@ -337,8 +338,13 @@ const PostDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <SkeletonCard media lines={4} footer />
+          <SkeletonBlock className="h-7 w-44" />
+          <SkeletonCard avatar lines={3} footer />
+          <SkeletonCard avatar lines={3} footer />
+        </div>
       </div>
     );
   }

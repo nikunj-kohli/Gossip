@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { getPosts, getDiscoverPosts, getCommunities, getPostById, sharePost, toggleLike, updatePost, deletePost, sendMessageRequest } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const FeedPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -21,6 +22,20 @@ const FeedPage = () => {
     { id: 'old', name: '🕰️ Old' },
     { id: 'top', name: '🏆 Top' },
   ];
+
+  const feedLabels = {
+    hybrid: 'Hybrid',
+    pulse: 'General',
+    tribes: 'Communities',
+    discover: 'Discover',
+  };
+
+  const feedDescriptions = {
+    hybrid: 'Balanced mix of general posts and community activity',
+    pulse: 'Broad general feed from across Gossip',
+    tribes: 'Community-first posts from your circles',
+    discover: 'Fresh posts you have not explored yet',
+  };
 
   useEffect(() => {
     fetchPosts();
@@ -334,8 +349,29 @@ const FeedPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3 space-y-4">
+              <div className="bg-white rounded-lg shadow-sm border p-4 space-y-4">
+                <SkeletonBlock className="h-8 w-72" />
+                <div className="flex gap-2">
+                  <SkeletonBlock className="h-8 w-20 rounded-full" />
+                  <SkeletonBlock className="h-8 w-24 rounded-full" />
+                  <SkeletonBlock className="h-8 w-28 rounded-full" />
+                  <SkeletonBlock className="h-8 w-24 rounded-full" />
+                </div>
+              </div>
+              <SkeletonCard avatar media lines={3} footer />
+              <SkeletonCard avatar media lines={4} footer />
+            </div>
+            <div className="space-y-4">
+              <SkeletonCard lines={3} />
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={3} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -359,13 +395,13 @@ const FeedPage = () => {
                   onClick={() => setFeedMode('pulse')}
                   className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'pulse' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  Pulse
+                  General
                 </button>
                 <button
                   onClick={() => setFeedMode('tribes')}
                   className={`px-3 py-1 rounded-full text-sm font-medium ${feedMode === 'tribes' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  Tribes
+                  Communities
                 </button>
                 <button
                   onClick={() => setFeedMode('discover')}
@@ -376,7 +412,7 @@ const FeedPage = () => {
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">Personalized feed</div>
+                <div className="text-sm text-gray-600">{feedDescriptions[feedMode] || 'Personalized feed'}</div>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -413,6 +449,7 @@ const FeedPage = () => {
                         className="h-10 w-10 rounded-full"
                         src={`https://ui-avatars.com/api/?name=${post.author_name || 'Anonymous'}&background=3B82F6&color=fff`}
                         alt={post.author_name || 'Anonymous'}
+                        loading="lazy"
                       />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">

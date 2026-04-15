@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { getCommunityById, getCommunityByName, updateGroup, deleteGroup } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const CommunityManagementPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -112,8 +113,11 @@ const CommunityManagementPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <SkeletonBlock className="h-8 w-56" />
+          <SkeletonCard media lines={3} footer />
+        </div>
       </div>
     );
   }
@@ -145,6 +149,7 @@ const CommunityManagementPage = () => {
               className="h-full w-full object-cover"
               src={formData.coverUrl || community.cover_url || `https://picsum.photos/seed/${encodeURIComponent(community?.slug || community?.name || 'community')}/1200/440`}
               alt="Community cover preview"
+              loading="lazy"
             />
           </div>
           <div className="p-6">
@@ -216,7 +221,7 @@ const CommunityManagementPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL (recommended 1:1, e.g. 512 x 512)</label>
                   <input
                     type="url"
                     value={formData.avatarUrl}
@@ -224,10 +229,11 @@ const CommunityManagementPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="https://..."
                   />
+                  <p className="mt-1 text-xs text-gray-500">Square avatars stay crisp in the community header and cards.</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cover URL</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cover URL (recommended 3:1, e.g. 1200 x 400)</label>
                   <input
                     type="url"
                     value={formData.coverUrl}
@@ -235,6 +241,7 @@ const CommunityManagementPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Leave empty to keep current cover"
                   />
+                  <p className="mt-1 text-xs text-gray-500">Wide banners are the best fit for the top cover section.</p>
                 </div>
 
                 <div className="flex justify-end space-x-3">

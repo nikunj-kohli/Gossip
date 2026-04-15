@@ -10,6 +10,7 @@ import {
   startInboxConversation,
   uploadInboxAttachment,
 } from '../api';
+import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
 
 const MessagesPage = () => {
   const { conversationId } = useParams();
@@ -29,6 +30,7 @@ const MessagesPage = () => {
   const [messageOffset, setMessageOffset] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const fileInputRef = useRef(null);
 
   const socketRef = useRef(null);
   const selectedConversationRef = useRef(null);
@@ -476,8 +478,23 @@ const MessagesPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="flex h-[calc(100vh-4rem)]">
+          <aside className="w-80 bg-white border-r border-gray-200 p-4 space-y-4">
+            <SkeletonBlock className="h-7 w-24" />
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={2} />
+          </aside>
+          <section className="flex-1 p-4 space-y-4">
+            <SkeletonBlock className="h-8 w-48" />
+            <SkeletonCard lines={3} media />
+            <SkeletonCard lines={2} media />
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <SkeletonBlock className="h-11 w-full rounded-full" />
+            </div>
+          </section>
+        </div>
       </div>
     );
   }
@@ -598,14 +615,23 @@ const MessagesPage = () => {
                   className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <input
+                  ref={fileInputRef}
                   type="file"
                   multiple
+                  accept="image/*,video/*,application/pdf"
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []).slice(0, 4);
                     setAttachmentFiles(files);
                   }}
-                  className="text-sm"
+                  className="hidden"
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 rounded-full border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Attach
+                </button>
                 <button
                   onClick={onSend}
                   disabled={isSending}
@@ -615,7 +641,14 @@ const MessagesPage = () => {
                 </button>
               </div>
               {attachmentFiles.length > 0 && (
-                <p className="mt-2 text-xs text-gray-500">{attachmentFiles.length} attachment(s) selected</p>
+                <div className="px-4 pb-3 text-xs text-gray-500 flex flex-wrap gap-2">
+                  <span>{attachmentFiles.length} attachment(s) selected</span>
+                  {attachmentFiles.map((file) => (
+                    <span key={`${file.name}-${file.size}`} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-gray-700">
+                      {file.name}
+                    </span>
+                  ))}
+                </div>
               )}
               {typingUsers.length > 0 && (
                 <p className="mt-2 text-xs text-gray-500">Someone is typing...</p>
