@@ -103,6 +103,26 @@ export const updateFeedPreferences = async (preferences) => {
   }
 };
 
+export const getNotificationPreferences = async () => {
+  try {
+    const response = await api.get('/notifications/preferences');
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching notification preferences:', error);
+    return { data: null, error };
+  }
+};
+
+export const updateNotificationPreference = async ({ type, status }) => {
+  try {
+    const response = await api.put('/notifications/preferences', { type, status });
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error updating notification preference:', error);
+    return { data: null, error };
+  }
+};
+
 export const markPostNotInterested = async (postId) => {
   try {
     const response = await api.post(`/posts/${postId}/not-interested`);
@@ -345,6 +365,56 @@ export const getCommunityMembers = async (communityId) => {
     return { data: response.data, error: null };
   } catch (error) {
     console.error('Error fetching community members:', error);
+    return { data: null, error };
+  }
+};
+
+export const changeCommunityMemberRole = async (communityId, userId, role) => {
+  try {
+    const response = await api.put(`/groups/${communityId}/members/${userId}/role`, { role });
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error changing community member role:', error);
+    return { data: null, error };
+  }
+};
+
+export const removeCommunityMember = async (communityId, userId) => {
+  try {
+    const response = await api.delete(`/groups/${communityId}/members/${userId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error removing community member:', error);
+    return { data: null, error };
+  }
+};
+
+export const banCommunityMember = async (communityId, userId) => {
+  try {
+    const response = await api.post(`/groups/${communityId}/ban/${userId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error banning community member:', error);
+    return { data: null, error };
+  }
+};
+
+export const unbanCommunityMember = async (communityId, userId) => {
+  try {
+    const response = await api.post(`/groups/${communityId}/unban/${userId}`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error unbanning community member:', error);
+    return { data: null, error };
+  }
+};
+
+export const getBannedCommunityMembers = async (communityId) => {
+  try {
+    const response = await api.get(`/groups/${communityId}/banned`);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error fetching banned community members:', error);
     return { data: null, error };
   }
 };

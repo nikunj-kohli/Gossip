@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { getCommunities, joinCommunity, createCommunity, getUserMemberships } from '../api';
+import { getCommunities, joinCommunity, createCommunity, getUserMemberships, uploadPostMedia } from '../api';
 import { SkeletonBlock, SkeletonCard } from '../components/Skeletons';
+import { cropImageToBlob } from '../utils/imageCrop';
 
 const CommunitiesPage = () => {
   const { user } = React.useContext(AuthContext);
@@ -13,6 +14,12 @@ const CommunitiesPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [createError, setCreateError] = useState('');
+  const [createAvatarPreview, setCreateAvatarPreview] = useState('');
+  const [createAvatarZoom, setCreateAvatarZoom] = useState(1);
+  const [createAvatarFile, setCreateAvatarFile] = useState(null);
+  const [createCoverPreview, setCreateCoverPreview] = useState('');
+  const [createCoverZoom, setCreateCoverZoom] = useState(1);
+  const [createCoverFile, setCreateCoverFile] = useState(null);
 
   const fetchCommunities = async () => {
     try {
@@ -152,6 +159,38 @@ const CommunitiesPage = () => {
     fetchCommunities();
     fetchUserCommunities();
   }, [user]);
+
+  const setFilePreview = (file, onPreview, onFile, onZoom) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onPreview(String(reader.result || ''));
+      onFile(file);
+      onZoom(1);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadCroppedImage = async ({ preview, zoom, width, height, fileNameBase }) => {
+    if (!preview) return null;
+
+    const blob = await cropImageToBlob({
+      dataUrl: preview,
+      zoom,
+      outputWidth: width,
+      outputHeight: height,
+    });
+
+    if (!blob) return null;
+
+    const file = new File([blob], `${fileNameBase}.jpg`, { type: 'image/jpeg' });
+    const uploadResult = await uploadPostMedia(file);
+    if (uploadResult.error || !uploadResult.data?.url) {
+      throw new Error(uploadResult.error?.response?.data?.message || uploadResult.error?.message || 'Failed to upload media');
+    }
+
+    return uploadResult.data.url;
+  };
 
   if (loading) {
     return (
@@ -329,7 +368,15 @@ const CommunitiesPage = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Create New Community</h3>
             <button
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => {
+                setShowCreateModal(false);
+                setCreateAvatarPreview('');
+                setCreateAvatarZoom(1);
+                setCreateAvatarFile(null);
+                setCreateCoverPreview('');
+                setCreateCoverZoom(1);
+                setCreateCoverFile(null);
+              }}
               className="text-gray-400 hover:text-gray-600"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,11 +393,29 @@ const CommunitiesPage = () => {
               name: formData.get('name'),
               description: formData.get('description'),
               privacy: formData.get('privacy') || 'public',
-              avatarUrl: formData.get('avatarUrl') || undefined,
-              coverUrl: formData.get('coverUrl') || undefined,
             };
             
             try {
+              if (createAvatarPreview) {
+                communityData.avatarUrl = await uploadCroppedImage({
+                  preview: createAvatarPreview,
+                  zoom: createAvatarZoom,
+                  width: 512,
+                  height: 512,
+                  fileNameBase: `${communityData.name || 'community'}-avatar`,
+                });
+              }
+
+              if (createCoverPreview) {
+                communityData.coverUrl = await uploadCroppedImage({
+                  preview: createCoverPreview,
+                  zoom: createCoverZoom,
+                  width: 1200,
+                  height: 400,
+                  fileNameBase: `${communityData.name || 'community'}-cover`,
+                });
+              }
+
               const { data, error } = await createCommunity(communityData);
               
               if (error) {
@@ -363,6 +428,12 @@ const CommunitiesPage = () => {
                 alert('Community created successfully!');
                 setShowCreateModal(false);
                 setCreateError('');
+                setCreateAvatarPreview('');
+                setCreateAvatarZoom(1);
+                setCreateAvatarFile(null);
+                setCreateCoverPreview('');
+                setCreateCoverZoom(1);
+                setCreateCoverFile(null);
                 await fetchCommunities(); // Refresh communities list
                 await fetchUserCommunities(); // Refresh user communities
               }
@@ -410,25 +481,67 @@ const CommunitiesPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL (recommended 1:1, e.g. 512 x 512)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Avatar (1:1)</label>
                 <input
-                  type="url"
-                  name="avatarUrl"
+                  type="file"
+                  accept="image/*"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://..."
+                  onChange={(e) => setFilePreview(e.target.files?.[0], setCreateAvatarPreview, setCreateAvatarFile, setCreateAvatarZoom)}
                 />
-                <p className="mt-1 text-xs text-gray-500">Square images work best for the community icon.</p>
+                <p className="mt-1 text-xs text-gray-500">Square image with zoom crop.</p>
+                {createAvatarPreview && (
+                  <div className="mt-3 space-y-2">
+                    <div className="mx-auto h-28 w-28 overflow-hidden rounded-xl border border-gray-200">
+                      <img
+                        src={createAvatarPreview}
+                        alt="Avatar preview"
+                        className="h-full w-full object-cover"
+                        style={{ transform: `scale(${createAvatarZoom})` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="2.5"
+                      step="0.05"
+                      value={createAvatarZoom}
+                      onChange={(e) => setCreateAvatarZoom(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL (recommended 3:1, e.g. 1200 x 400)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cover (3:1)</label>
                 <input
-                  type="url"
-                  name="coverUrl"
+                  type="file"
+                  accept="image/*"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Leave blank to auto-generate a free cover"
+                  onChange={(e) => setFilePreview(e.target.files?.[0], setCreateCoverPreview, setCreateCoverFile, setCreateCoverZoom)}
                 />
-                <p className="mt-1 text-xs text-gray-500">If blank, a free default cover is auto-generated based on community topic.</p>
+                <p className="mt-1 text-xs text-gray-500">Wide banner with zoom crop. Leave empty to auto-generate.</p>
+                {createCoverPreview && (
+                  <div className="mt-3 space-y-2">
+                    <div className="mx-auto h-24 w-full overflow-hidden rounded-xl border border-gray-200">
+                      <img
+                        src={createCoverPreview}
+                        alt="Cover preview"
+                        className="h-full w-full object-cover"
+                        style={{ transform: `scale(${createCoverZoom})` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="2.5"
+                      step="0.05"
+                      value={createCoverZoom}
+                      onChange={(e) => setCreateCoverZoom(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end space-x-3">

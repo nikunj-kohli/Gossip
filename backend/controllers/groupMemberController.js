@@ -15,7 +15,7 @@ const joinGroup = async (req, res) => {
         
         res.json({
             message: result.message,
-            membership: result.member
+            membership: result.membership || null
         });
     } catch (error) {
         console.error('Error joining group:', error);
@@ -92,7 +92,7 @@ const changeMemberRole = async (req, res) => {
             });
         }
         
-        const result = await GroupMember.changeRole(groupId, userId, role);
+        const result = await GroupMember.changeRole(groupId, currentUserId, userId, role);
         
         if (!result.success) {
             return res.status(400).json({ message: result.message });
@@ -100,7 +100,7 @@ const changeMemberRole = async (req, res) => {
         
         res.json({
             message: result.message,
-            membership: result.member
+            membership: result.membership || null
         });
     } catch (error) {
         console.error('Error changing member role:', error);
@@ -140,7 +140,7 @@ const removeMember = async (req, res) => {
             });
         }
         
-        const result = await GroupMember.removeMember(groupId, userId);
+        const result = await GroupMember.removeMember(groupId, currentUserId, userId);
         
         if (!result.success) {
             return res.status(400).json({ message: result.message });
@@ -185,7 +185,7 @@ const banMember = async (req, res) => {
             });
         }
         
-        const result = await GroupMember.banMember(groupId, userId);
+        const result = await GroupMember.banMember(groupId, currentUserId, userId);
         
         if (!result.success) {
             return res.status(400).json({ message: result.message });
@@ -193,7 +193,7 @@ const banMember = async (req, res) => {
         
         res.json({
             message: result.message,
-            membership: result.member
+            membership: result.membership || null
         });
     } catch (error) {
         console.error('Error banning member:', error);
@@ -216,7 +216,7 @@ const unbanMember = async (req, res) => {
             });
         }
         
-        const result = await GroupMember.unbanMember(groupId, userId);
+        const result = await GroupMember.unbanMember(groupId, currentUserId, userId);
         
         if (!result.success) {
             return res.status(400).json({ message: result.message });
@@ -224,7 +224,7 @@ const unbanMember = async (req, res) => {
         
         res.json({
             message: result.message,
-            membership: result.member
+            membership: result.membership || null
         });
     } catch (error) {
         console.error('Error unbanning member:', error);
@@ -248,7 +248,7 @@ const getBannedMembers = async (req, res) => {
             });
         }
         
-        const result = await GroupMember.getBannedMembers(groupId, {
+        const result = await GroupMember.getBannedMembers(groupId, currentUserId, {
             limit: parseInt(limit) || 20,
             offset: parseInt(offset) || 0
         });

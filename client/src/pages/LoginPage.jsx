@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
@@ -11,7 +11,15 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef(null);
   const { login } = useContext(AuthContext);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((value) => !value);
+    requestAnimationFrame(() => {
+      passwordInputRef.current?.focus();
+    });
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -86,6 +94,7 @@ const LoginPage = () => {
               </label>
               <div className="relative">
                 <input
+                  ref={passwordInputRef}
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
@@ -98,8 +107,10 @@ const LoginPage = () => {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-[#0F766E] hover:text-[#085f58]"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 z-20 flex items-center px-3 text-xs font-semibold text-[#0F766E] hover:text-[#085f58]"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>

@@ -79,13 +79,21 @@ const getAllGroups = async (req, res) => {
 // Get group by ID or slug
 const getGroupById = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { groupId } = req.params;
         const userId = req.user ? req.user.id : null;
         
-        const group = await Group.getByIdOrSlug(id, userId);
+        const group = await Group.getByIdOrSlug(groupId, userId);
         
         if (!group) {
             return res.status(404).json({ message: 'Group not found' });
+        }
+
+        if (group.banned) {
+            return res.status(403).json({
+                message: 'You are banned from this community',
+                banned: true,
+                id: group.id
+            });
         }
         
         // If group is private and restricted
@@ -168,12 +176,12 @@ const getUserMemberships = async (req, res) => {
 // Update group
 const updateGroup = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { groupId } = req.params;
         const { name, description, privacy, avatarUrl, coverUrl } = req.body;
         const userId = req.user.id;
         
         // Update group
-        const updatedGroup = await Group.update(id, userId, {
+        const updatedGroup = await Group.update(groupId, userId, {
             name,
             description,
             privacy,
@@ -208,10 +216,10 @@ const updateGroup = async (req, res) => {
 // Delete group
 const deleteGroup = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { groupId } = req.params;
         const userId = req.user.id;
         
-        const result = await Group.delete(id, userId);
+        const result = await Group.delete(groupId, userId);
         
         if (!result.success) {
             if (result.message === 'Unauthorized to delete this group') {

@@ -71,6 +71,12 @@ class Group {
             let query = `
                 SELECT 
                     g.*,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM group_members gm_count
+                        WHERE gm_count.group_id = g.id
+                        AND gm_count.is_banned = FALSE
+                    ) as member_count,
                     u.display_name as creator_name,
                     u.username as creator_username
             `;
@@ -133,6 +139,13 @@ class Group {
                     SELECT 1 FROM group_members 
                     WHERE group_id = g.id AND user_id = $${userIdParamIndex} AND is_banned = FALSE
                 )))`;
+
+                query += ` AND NOT EXISTS(
+                    SELECT 1 FROM group_members gm_ban
+                    WHERE gm_ban.group_id = g.id
+                    AND gm_ban.user_id = $${userIdParamIndex}
+                    AND gm_ban.is_banned = TRUE
+                )`;
             }
 
             // Add order by clause
@@ -174,6 +187,12 @@ class Group {
             let query = `
                 SELECT 
                     g.*,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM group_members gm_count
+                        WHERE gm_count.group_id = g.id
+                        AND gm_count.is_banned = FALSE
+                    ) as member_count,
                     u.display_name as creator_name,
                     u.username as creator_username
             `;
@@ -185,12 +204,16 @@ class Group {
                         SELECT 1 FROM group_members 
                         WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
                     )) as is_member,
+                    (SELECT EXISTS(
+                        SELECT 1 FROM group_members
+                        WHERE group_id = g.id AND user_id = $2 AND is_banned = TRUE
+                    )) as is_banned,
                     (SELECT role FROM group_members 
                         WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
                     ) as user_role
                 `;
             } else {
-                query += `, false as is_member, null as user_role`;
+                query += `, false as is_member, false as is_banned, null as user_role`;
             }
             
             query += `
@@ -215,9 +238,13 @@ class Group {
             }
             
             const group = result.rows[0];
+
+            if (group.is_banned) {
+                return { id: group.id, banned: true, restricted: true };
+            }
             
-            // If group is private and user is not a member (and not public), deny access
-            if (group.privacy === 'private' && !group.is_member && !userId) {
+            // If group is private and user is not a member, deny access.
+            if (group.privacy === 'private' && !group.is_member) {
                 return { id: group.id, privacy: 'private', restricted: true };
             }
             
@@ -233,6 +260,12 @@ class Group {
             let query = `
                 SELECT 
                     g.*,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM group_members gm_count
+                        WHERE gm_count.group_id = g.id
+                        AND gm_count.is_banned = FALSE
+                    ) as member_count,
                     u.display_name as creator_name,
                     u.username as creator_username
             `;
@@ -320,6 +353,12 @@ class Group {
             let query = `
                 SELECT 
                     g.*,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM group_members gm_count
+                        WHERE gm_count.group_id = g.id
+                        AND gm_count.is_banned = FALSE
+                    ) as member_count,
                     u.display_name as creator_name,
                     u.username as creator_username
             `;
@@ -331,12 +370,16 @@ class Group {
                         SELECT 1 FROM group_members 
                         WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
                     )) as is_member,
+                    (SELECT EXISTS(
+                        SELECT 1 FROM group_members
+                        WHERE group_id = g.id AND user_id = $2 AND is_banned = TRUE
+                    )) as is_banned,
                     (SELECT role FROM group_members 
                         WHERE group_id = g.id AND user_id = $2 AND is_banned = FALSE
                     ) as user_role
                 `;
             } else {
-                query += `, false as is_member, null as user_role`;
+                query += `, false as is_member, false as is_banned, null as user_role`;
             }
             
             query += `
@@ -347,8 +390,9 @@ class Group {
             
             const params = currentUserId ? [name, currentUserId] : [name];
             const result = await db.query(query, params);
-            
-            return result.rows;
+
+            const rows = result.rows || [];
+            return rows.filter((row) => !row.is_banned);
         } catch (error) {
             throw error;
         }
@@ -621,6 +665,25 @@ class Group {
             }
 
             const group = groupResult.rows[0];
+
+            if (userId) {
+                const bannedResult = await db.query(
+                    `
+                        SELECT 1
+                        FROM group_members
+                        WHERE group_id = $1
+                        AND user_id = $2
+                        AND is_banned = TRUE
+                        LIMIT 1
+                    `,
+                    [groupId, userId]
+                );
+
+                if (bannedResult.rows.length) {
+                    return { access: false, message: 'You are banned from this group' };
+                }
+            }
+
             if (group.privacy === 'public') {
                 return { access: true };
             }

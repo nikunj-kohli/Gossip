@@ -32,6 +32,24 @@ class GroupMember {
         return { success: true, membership };
     }
 
+    static async getUserRole(groupId, userId) {
+        const result = await db.query(
+            `
+                SELECT role, is_banned
+                FROM group_members
+                WHERE group_id = $1 AND user_id = $2
+                LIMIT 1
+            `,
+            [groupId, userId]
+        );
+
+        if (!result.rows.length || result.rows[0].is_banned) {
+            return { role: null };
+        }
+
+        return { role: result.rows[0].role };
+    }
+
     // Join a group
     static async join(groupId, userId) {
         try {
@@ -410,14 +428,15 @@ class GroupMember {
                 const insertQuery = `
                     INSERT INTO group_members (group_id, user_id, role, is_banned)
                     VALUES ($1, $2, 'member', TRUE)
-                    RETURNING id
+                    RETURNING *
                 `;
                 
-                await db.query(insertQuery, [groupId, targetUserId]);
+                const insertResult = await db.query(insertQuery, [groupId, targetUserId]);
                 
                 return {
                     success: true,
-                    message: 'User has been banned from the group'
+                    message: 'User has been banned from the group',
+                    membership: insertResult.rows[0]
                 };
             }
             
@@ -450,14 +469,15 @@ class GroupMember {
                 UPDATE group_members
                 SET is_banned = TRUE
                 WHERE group_id = $1 AND user_id = $2
-                RETURNING id
+                RETURNING *
             `;
             
-            await db.query(banQuery, [groupId, targetUserId]);
+            const banResult = await db.query(banQuery, [groupId, targetUserId]);
             
             return {
                 success: true,
-                message: 'Member banned from group'
+                message: 'Member banned from group',
+                membership: banResult.rows[0]
             };
         } catch (error) {
             throw error;
@@ -499,14 +519,15 @@ class GroupMember {
                 UPDATE group_members
                 SET is_banned = FALSE
                 WHERE group_id = $1 AND user_id = $2
-                RETURNING id
+                RETURNING *
             `;
             
-            await db.query(unbanQuery, [groupId, targetUserId]);
+            const unbanResult = await db.query(unbanQuery, [groupId, targetUserId]);
             
             return {
                 success: true,
-                message: 'Member unbanned from group'
+                message: 'Member unbanned from group',
+                membership: unbanResult.rows[0]
             };
         } catch (error) {
             throw error;
