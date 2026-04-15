@@ -218,7 +218,38 @@ class Conversation {
                 LIMIT $2 OFFSET $3
             `;
             
-            const result = await db.query(query, [userId, limit, offset]);
+            let result;
+            try {
+                result = await db.query(query, [userId, limit, offset]);
+            } catch (queryError) {
+                const fallbackQuery = `
+                    SELECT 
+                        c.id, c.user1_id, c.user2_id, c.last_message_at, c.created_at, c.updated_at,
+                        (
+                            SELECT COUNT(*) 
+                            FROM messages m 
+                            WHERE m.conversation_id = c.id 
+                            AND m.sender_id != $1 
+                            AND m.is_read = false
+                        ) as unread_count,
+                        (
+                            SELECT m.content
+                            FROM messages m
+                            WHERE m.conversation_id = c.id
+                            ORDER BY m.created_at DESC, m.id DESC
+                            LIMIT 1
+                        ) as last_message_content
+                    FROM 
+                        conversations c
+                    WHERE 
+                        c.user1_id = $1 OR c.user2_id = $1
+                    ORDER BY 
+                        c.last_message_at DESC NULLS LAST, c.created_at DESC
+                    LIMIT $2 OFFSET $3
+                `;
+
+                result = await db.query(fallbackQuery, [userId, limit, offset]);
+            }
             
             // Get other participants for each conversation
             const conversations = [];

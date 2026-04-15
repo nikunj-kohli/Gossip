@@ -3,6 +3,7 @@ const {
 	register,
 	login,
 	getProfile,
+	updateProfile,
 	validateToken,
 	sendForgotPasswordOtp,
 	verifyForgotPasswordOtp,
@@ -22,5 +23,6 @@ router.get('/validate', authenticateToken, validateToken);
 
 // Protected routes
 router.get('/profile', authenticateToken, getProfile);
+router.put('/profile', authenticateToken, updateProfile);
 
 module.exports = router;

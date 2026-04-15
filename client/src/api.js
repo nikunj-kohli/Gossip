@@ -133,6 +133,16 @@ export const getUserProfile = async (username) => {
   }
 };
 
+export const updateMyProfile = async (payload) => {
+  try {
+    const response = await api.put('/auth/profile', payload);
+    return { data: response.data, error: null };
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    return { data: null, error };
+  }
+};
+
 export const createPost = async (postData) => {
   try {
     const response = await api.post('/posts', postData);

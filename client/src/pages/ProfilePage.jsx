@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { getUserProfile, checkMessagingAccessStatus, startInboxConversation, createPost, getUserPosts, getPostById, toggleLike, updatePost, deletePost, sendMessageRequest, uploadPostMedia } from '../api';
+import { getUserProfile, checkMessagingAccessStatus, startInboxConversation, getUserPosts, getPostById, toggleLike, updatePost, deletePost, sendMessageRequest, uploadPostMedia, updateMyProfile } from '../api';
 
 const ProfilePage = () => {
   const { username } = useParams();
-  const { user: currentUser } = useContext(AuthContext);
+  const { user: currentUser, updateUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const [profileUser, setProfileUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +18,15 @@ const ProfilePage = () => {
   const [editContent, setEditContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileAvatarFile, setProfileAvatarFile] = useState(null);
+  const [profileAvatarPreview, setProfileAvatarPreview] = useState('');
+  const [profileAvatarZoom, setProfileAvatarZoom] = useState(1);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const avatarInputRef = useRef(null);
+
+  const profileAvatarSrc = profileUser?.avatar_url
+    || `https://ui-avatars.com/api/?name=${profileUser?.display_name || profileUser?.username}&background=3B82F6&color=fff`;
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -162,6 +171,95 @@ const ProfilePage = () => {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openAvatarPicker = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const onAvatarFileSelected = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfileAvatarFile(file);
+      setProfileAvatarPreview(String(reader.result || ''));
+      setProfileAvatarZoom(1);
+      setIsEditingProfile(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const buildSquareAvatarBlob = async () => {
+    if (!profileAvatarPreview) return null;
+
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.src = profileAvatarPreview;
+
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
+
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    const scale = Math.max(1, Number(profileAvatarZoom) || 1);
+    const sourceSize = Math.min(image.width, image.height) / scale;
+    const sourceX = (image.width - sourceSize) / 2;
+    const sourceY = (image.height - sourceSize) / 2;
+
+    context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92);
+    });
+  };
+
+  const handleSaveAvatar = async () => {
+    try {
+      if (!profileAvatarFile) return;
+      setProfileSaving(true);
+
+      const blob = await buildSquareAvatarBlob();
+      if (!blob) {
+        alert('Unable to process avatar image.');
+        return;
+      }
+
+      const avatarFile = new File([blob], profileAvatarFile.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+      const { data: uploadData, error: uploadError } = await uploadPostMedia(avatarFile);
+      if (uploadError || !uploadData?.url) {
+        alert(uploadError?.response?.data?.message || uploadError?.message || 'Failed to upload avatar');
+        return;
+      }
+
+      const { data, error } = await updateMyProfile({ avatarUrl: uploadData.url });
+      if (error) {
+        alert(error.response?.data?.message || 'Failed to update profile');
+        return;
+      }
+
+      const nextUser = {
+        ...currentUser,
+        avatar_url: data?.user?.avatar_url || uploadData.url,
+      };
+      updateUser(nextUser);
+      setProfileUser((prev) => prev ? { ...prev, avatar_url: uploadData.url } : prev);
+      setIsEditingProfile(false);
+      setProfileAvatarFile(null);
+      setProfileAvatarPreview('');
+      alert('Profile avatar updated');
+    } catch (error) {
+      console.error('Error saving avatar:', error);
+      alert('Failed to update avatar');
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -378,9 +476,11 @@ const ProfilePage = () => {
           <div className="flex flex-col sm:flex-row gap-6">
             {/* Avatar */}
             <div className="flex-shrink-0">
-              <div className="w-24 h-24 bg-center bg-cover rounded-full border-2 border-gray-200" 
-                   style={{backgroundImage: `url("${profileUser?.avatar_url || `https://ui-avatars.com/api/?name=${profileUser?.display_name || profileUser?.username}&background=3B82F6&color=fff`}")`}}>
-              </div>
+              <img
+                className="w-24 h-24 rounded-full border-2 border-gray-200 object-cover bg-white"
+                src={profileAvatarSrc}
+                alt={profileUser?.display_name || profileUser?.username}
+              />
             </div>
             
             {/* User Info */}
@@ -452,59 +552,27 @@ const ProfilePage = () => {
             </div>
           </div>
           
-          {/* Create Post - Only for current user */}
           {isCurrentUser && (
-            <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-              <form onSubmit={handleCreatePost}>
-                <div className="flex items-start space-x-3">
-                  <img
-                    className="h-10 w-10 rounded-full"
-                    src={currentUser?.avatar_url || `https://ui-avatars.com/api/?name=${currentUser?.displayName || currentUser?.username}&background=3B82F6&color=fff`}
-                    alt={currentUser?.displayName || currentUser?.username}
-                  />
-                  <div className="flex-1">
-                    <textarea
-                      value={newPost}
-                      onChange={(e) => setNewPost(e.target.value)}
-                      placeholder="What's on your mind? Add text or attach photos/videos."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      rows="3"
-                    />
-                    <div className="mt-2">
-                      <input
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        onChange={(e) => setMediaFiles(Array.from(e.target.files || []).slice(0, 4))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      {mediaFiles.length > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">{mediaFiles.length} file(s) selected</p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center space-x-4">
-                        <label className="flex items-center space-x-2 text-sm text-gray-600">
-                          <input
-                            type="checkbox"
-                            checked={isAnonymous}
-                            onChange={(e) => setIsAnonymous(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span>Anonymous</span>
-                        </label>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={(!newPost.trim() && mediaFiles.length === 0) || isSubmitting}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md text-sm font-medium disabled:cursor-not-allowed"
-                      >
-                        {isSubmitting ? 'Posting...' : 'Post'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </form>
+            <div className="bg-gradient-to-r from-white to-[#fcf8f1] rounded-lg shadow-sm border p-4 mb-6 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Your profile is personal.</p>
+                <p className="text-sm text-gray-600">Use Wall to publish posts. Edit your avatar here.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={openAvatarPicker}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+                >
+                  Update avatar
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onAvatarFileSelected(e.target.files?.[0])}
+                />
+              </div>
             </div>
           )}
           
@@ -528,7 +596,9 @@ const ProfilePage = () => {
                         <div className="flex items-center space-x-2 mb-2">
                           <img
                             className="h-8 w-8 rounded-full"
-                            src={`https://ui-avatars.com/api/?name=${post.is_anonymous ? 'Anonymous' : profileUser?.display_name || profileUser?.username}&background=3B82F6&color=fff`}
+                            src={post.is_anonymous
+                              ? `https://ui-avatars.com/api/?name=Anonymous&background=3B82F6&color=fff`
+                              : profileUser?.avatar_url || `https://ui-avatars.com/api/?name=${profileUser?.display_name || profileUser?.username}&background=3B82F6&color=fff`}
                             alt={post.is_anonymous ? 'Anonymous' : profileUser?.display_name || profileUser?.username}
                           />
                           <div>
@@ -647,6 +717,61 @@ const ProfilePage = () => {
           )}
         </div>
       </main>
+
+      {isEditingProfile && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Update avatar</h3>
+              <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-gray-700">Close</button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="mx-auto flex h-64 w-64 items-center justify-center overflow-hidden rounded-3xl border border-dashed border-gray-300 bg-gray-50">
+                {profileAvatarPreview ? (
+                  <img
+                    src={profileAvatarPreview}
+                    alt="Avatar preview"
+                    className="h-full w-full object-cover"
+                    style={{ transform: `scale(${profileAvatarZoom})` }}
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500">Choose a square-friendly image</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Zoom crop</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="2.5"
+                  step="0.05"
+                  value={profileAvatarZoom}
+                  onChange={(e) => setProfileAvatarZoom(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setIsEditingProfile(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAvatar}
+                  disabled={profileSaving || !profileAvatarFile}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {profileSaving ? 'Saving...' : 'Save avatar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

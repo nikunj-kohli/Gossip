@@ -66,6 +66,44 @@ class User{
         const result = await db.query(query, [passwordHash, email]);
         return result.rows[0] || null;
     }
+
+    static async updateProfile(userId, { displayName, bio, avatarUrl }) {
+        const updates = [];
+        const values = [];
+        let index = 1;
+
+        if (displayName !== undefined) {
+            updates.push(`display_name = $${index++}`);
+            values.push(displayName);
+        }
+
+        if (bio !== undefined) {
+            updates.push(`bio = $${index++}`);
+            values.push(bio);
+        }
+
+        if (avatarUrl !== undefined) {
+            updates.push(`avatar_url = $${index++}`);
+            values.push(avatarUrl);
+        }
+
+        if (updates.length === 0) {
+            return this.findById(userId);
+        }
+
+        values.push(userId);
+
+        const query = `
+          UPDATE users
+          SET ${updates.join(', ')},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $${index}
+          RETURNING id, username, email, display_name, bio, avatar_url, status, email_verified, last_login, created_at, updated_at, is_active
+        `;
+
+        const result = await db.query(query, values);
+        return result.rows[0] || null;
+    }
 }
 
 module.exports = User;

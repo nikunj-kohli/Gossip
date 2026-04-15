@@ -150,6 +150,12 @@ const FriendsPage = () => {
     return connections;
   }, [tab, incoming, outgoing, connections]);
 
+  const getAvatarUrl = (row) => row?.avatar_url
+    || row?.user?.avatar_url
+    || row?.requester_avatar
+    || row?.addressee_avatar
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(row?.display_name || row?.username || 'User')}&background=3B82F6&color=fff`;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -234,9 +240,17 @@ const FriendsPage = () => {
 
                 return (
                   <div key={`${tab}-${userId}-${row.friendship_id || row.id || ''}`} className="border rounded-md p-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{name}</p>
-                      <p className="text-xs text-gray-500">@{uname}</p>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={getAvatarUrl(row)}
+                        alt={name}
+                        className="h-10 w-10 rounded-full border border-gray-200 object-cover"
+                        loading="lazy"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">{name}</p>
+                        <p className="text-xs text-gray-500">@{uname}</p>
+                      </div>
                     </div>
 
                     {tab === 'incoming' && (

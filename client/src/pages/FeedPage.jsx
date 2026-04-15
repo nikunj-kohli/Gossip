@@ -208,6 +208,14 @@ const FeedPage = () => {
     }
   };
 
+  const getAvatarUrl = (post) => {
+    const name = post?.author_name || post?.author?.display_name || post?.author?.username || 'Anonymous';
+    return post?.author_avatar
+      || post?.author?.avatar_url
+      || post?.user?.avatar_url
+      || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff`;
+  };
+
   const extractMediaFromContent = (content = '') => {
     const urlRegex = /https?:\/\/[^\s]+/gi;
     const urls = String(content).match(urlRegex) || [];
@@ -447,7 +455,7 @@ const FeedPage = () => {
                     <div className="flex items-start space-x-3">
                       <img
                         className="h-10 w-10 rounded-full"
-                        src={`https://ui-avatars.com/api/?name=${post.author_name || 'Anonymous'}&background=3B82F6&color=fff`}
+                        src={getAvatarUrl(post)}
                         alt={post.author_name || 'Anonymous'}
                         loading="lazy"
                       />
@@ -651,21 +659,30 @@ const FeedPage = () => {
             </div>
 
             {/* Quick Links */}
-            <div className="bg-white rounded-lg shadow-sm border p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Quick Links</h3>
-              <div className="space-y-2">
-                <Link to="/communities" className="block text-sm text-blue-600 hover:text-blue-700">
-                  🏘️ Browse Communities
-                </Link>
-                <Link to="/requests" className="block text-sm text-blue-600 hover:text-blue-700">
-                  👥 Request Center
-                </Link>
-                <Link to="/inbox" className="block text-sm text-blue-600 hover:text-blue-700">
-                  💬 Inbox
-                </Link>
-                <Link to={profilePath} className="block text-sm text-blue-600 hover:text-blue-700">
-                  👤 Profile
-                </Link>
+            <div className="overflow-hidden rounded-2xl border border-[#e6dfd1] bg-white shadow-sm">
+              <div className="border-b border-[#eee7d9] bg-[#faf8f3] px-4 py-3">
+                <h3 className="font-semibold text-gray-900">Quick Links</h3>
+                <p className="text-xs text-gray-500">Fast shortcuts to the parts you use most.</p>
+              </div>
+              <div className="space-y-1 p-3">
+                {[
+                  { to: '/communities', label: 'Browse Communities', icon: '🏘️' },
+                  { to: '/requests', label: 'Request Center', icon: '👥' },
+                  { to: '/inbox', label: 'Inbox', icon: '💬' },
+                  { to: profilePath, label: 'Profile', icon: '👤' },
+                ].map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="flex items-center justify-between rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-700 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    <span className="text-gray-300">›</span>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>

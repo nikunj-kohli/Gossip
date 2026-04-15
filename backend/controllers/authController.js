@@ -48,7 +48,9 @@ const register = async (req, res) => {
                 id: user.id,
                 username: user.username,
                 email: user.email,
-                displayName: user.display_name
+                displayName: user.display_name,
+                avatar_url: user.avatar_url || null,
+                bio: user.bio || null
             },
             token
         });
@@ -90,7 +92,9 @@ const login = async (req, res) => {
                 id: user.id,
                 username: user.username,
                 email: user.email,
-                displayName: user.display_name
+                displayName: user.display_name,
+                avatar_url: user.avatar_url || null,
+                bio: user.bio || null
             },
             token
         });
@@ -110,6 +114,7 @@ const getProfile = async (req, res) => {
                 username: req.user.username,
                 email: req.user.email,
                 displayName: req.user.display_name,
+                avatar_url: req.user.avatar_url || null,
                 bio: req.user.bio,
                 createdAt: req.user.created_at
             }
@@ -244,10 +249,41 @@ const resetPasswordWithOtp = async (req, res) => {
     }
 };
 
+const updateProfile = async (req, res) => {
+    try {
+        const { displayName, bio, avatarUrl } = req.body || {};
+        const updatedUser = await User.updateProfile(req.user.id, {
+            displayName,
+            bio,
+            avatarUrl,
+        });
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.json({
+            message: 'Profile updated successfully',
+            user: {
+                id: updatedUser.id,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                displayName: updatedUser.display_name,
+                avatar_url: updatedUser.avatar_url || null,
+                bio: updatedUser.bio || null,
+            },
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 module.exports = {
     register,
     login,
     getProfile,
+    updateProfile,
     validateToken,
     sendForgotPasswordOtp,
     verifyForgotPasswordOtp,

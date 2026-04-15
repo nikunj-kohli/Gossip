@@ -517,6 +517,8 @@ const MessagesPage = () => {
                 const participant = conversation.participants?.[0];
                 const displayName = participant?.display_name || participant?.username || 'Unknown';
                 const previewText = conversation.last_message || 'No messages yet';
+                const participantAvatar = participant?.avatar_url
+                  || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3B82F6&color=fff`;
                 return (
                   <button
                     key={conversation.id}
@@ -526,8 +528,18 @@ const MessagesPage = () => {
                     }}
                     className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 ${parseInt(selectedConversation?.id, 10) === parseInt(conversation.id, 10) ? 'bg-blue-50' : ''}`}
                   >
-                    <div className="font-medium text-gray-900">{displayName}</div>
-                    <div className="text-sm text-gray-500 truncate">{previewText}</div>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={participantAvatar}
+                        alt={displayName}
+                        className="h-10 w-10 rounded-full border border-gray-200 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 truncate">{displayName}</div>
+                        <div className="text-sm text-gray-500 truncate">{previewText}</div>
+                      </div>
+                    </div>
                   </button>
                 );
               })
@@ -541,9 +553,17 @@ const MessagesPage = () => {
           ) : (
             <>
               <div className="p-4 border-b border-gray-200 bg-white">
-                <h3 className="font-medium text-gray-900">
-                  {selectedConversation.participants?.[0]?.display_name || selectedConversation.participants?.[0]?.username || 'Conversation'}
-                </h3>
+                <div className="flex items-center gap-3">
+                  <img
+                    src={selectedConversation.participants?.[0]?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConversation.participants?.[0]?.display_name || selectedConversation.participants?.[0]?.username || 'Conversation')}&background=3B82F6&color=fff`}
+                    alt={selectedConversation.participants?.[0]?.display_name || selectedConversation.participants?.[0]?.username || 'Conversation'}
+                    className="h-10 w-10 rounded-full border border-gray-200 object-cover"
+                    loading="lazy"
+                  />
+                  <h3 className="font-medium text-gray-900">
+                    {selectedConversation.participants?.[0]?.display_name || selectedConversation.participants?.[0]?.username || 'Conversation'}
+                  </h3>
+                </div>
               </div>
 
               <div 

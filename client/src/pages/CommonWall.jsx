@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from "../contexts/AuthContext";
 import { getPosts, createPost, getUserMemberships, getPostById, uploadPostMedia } from '../api';
@@ -16,6 +16,7 @@ const CommonWall = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [wallFilter, setWallFilter] = useState('mine');
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -170,6 +171,26 @@ const CommonWall = () => {
     }
   };
 
+  const isOwnPost = (post) => {
+    const currentUserId = user?.id;
+    return String(post?.user_id || post?.author?.id || post?.author_id || '') === String(currentUserId || '');
+  };
+
+  const visiblePosts = useMemo(() => {
+    const rows = Array.isArray(posts) ? posts : [];
+
+    switch (wallFilter) {
+      case 'mine':
+        return rows.filter((post) => isOwnPost(post));
+      case 'anonymous':
+        return rows.filter((post) => Boolean(post.is_anonymous));
+      case 'community':
+        return rows.filter((post) => Boolean(post.group_id || post.group_name || post.group_slug));
+      default:
+        return rows;
+    }
+  }, [posts, wallFilter, user]);
+
   useEffect(() => {
     const initializeWall = async () => {
       await fetchPosts();
@@ -202,8 +223,25 @@ const CommonWall = () => {
         <div className="mb-6 rounded-3xl border border-white/70 bg-gradient-to-br from-[#f7f1e8] via-white to-[#eef4ff] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <h1 className="text-3xl font-bold text-gray-900">Wall</h1>
           <p className="mt-2 max-w-2xl text-sm text-gray-600">
-            Share a thought, drop a link, or attach media without switching post modes.
+            Your wall is focused on your account by default. Switch filters if you want to inspect anonymous or community posts.
           </p>
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-[#e5ddd0] bg-white p-3 shadow-sm">
+          {[
+            { id: 'mine', label: 'Mine' },
+            { id: 'anonymous', label: 'Anonymous' },
+            { id: 'community', label: 'Communities' },
+            { id: 'all', label: 'All' },
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setWallFilter(filter.id)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${wallFilter === filter.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
         
         {/* Create Post Section */}
@@ -349,12 +387,12 @@ const CommonWall = () => {
 
         {/* Posts Feed */}
         <div className="space-y-4">
-          {posts.length === 0 ? (
+          {visiblePosts.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <p className="text-gray-500">No posts yet. Be the first to share something!</p>
+              <p className="text-gray-500">No posts match this filter yet.</p>
             </div>
           ) : (
-            posts.map((post) => {
+            visiblePosts.map((post) => {
               const media = normalizeMediaContent(post.content);
               return (
               <div key={post.id} className="bg-white rounded-lg shadow-md p-6">
