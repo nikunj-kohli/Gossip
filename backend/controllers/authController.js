@@ -64,7 +64,7 @@ const register = async (req, res) => {
 // Login user
 const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, rememberMe } = req.body;
 
         // Validation
         if (!email || !password) {
@@ -84,7 +84,10 @@ const login = async (req, res) => {
         }
 
         // Generate JWT token
-        const token = generateToken({ userId: user.id, username: user.username });
+        const token = generateToken(
+            { userId: user.id, username: user.username },
+            { noExpiry: rememberMe === true }
+        );
 
         res.json({
             message: 'Login successful',

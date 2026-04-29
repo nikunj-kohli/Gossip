@@ -36,7 +36,7 @@ const { authenticateToken, isAdmin } = require('./middleware/auth');
 const initializeServices = async () => {
   try {
     // Initialize query monitoring
-    await initQueryMonitoring();
+    await initQueryMonitoring(db.pool);
     
     // Initialize other services as needed
     console.log('All services initialized successfully');
@@ -315,7 +315,7 @@ app.get('/api/admin/slow-queries', authenticateToken, isAdmin, async (req, res) 
   const threshold = parseInt(req.query.threshold) || 200;
   const limit = parseInt(req.query.limit) || 100;
   
-  const report = await getSlowQueryReport(threshold, limit);
+  const report = await getSlowQueryReport(db.pool, threshold, limit);
   res.json(report);
 });
 

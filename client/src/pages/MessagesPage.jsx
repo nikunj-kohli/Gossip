@@ -171,7 +171,8 @@ const MessagesPage = () => {
     const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     const socket = io(socketUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      withCredentials: true,
     });
 
     socketRef.current = socket;

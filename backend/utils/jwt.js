@@ -2,10 +2,14 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 // Generate JWT token
-const generateToken = (payload) => {
-    return jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d'
-    });
+const generateToken = (payload, options = {}) => {
+    const signOptions = {};
+
+    if (!options.noExpiry) {
+        signOptions.expiresIn = options.expiresIn || process.env.JWT_EXPIRES_IN || '7d';
+    }
+
+    return jwt.sign(payload, process.env.JWT_SECRET, signOptions);
 };
 
 // Verify JWT token

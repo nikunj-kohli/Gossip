@@ -6,7 +6,8 @@ import { AuthContext } from '../contexts/AuthContext';
 const LoginPage = () => {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    rememberMe: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -122,9 +123,11 @@ const LoginPage = () => {
             <div className="flex items-center">
               <input
                 id="remember-me"
-                name="remember-me"
+                name="rememberMe"
                 type="checkbox"
                 className="h-4 w-4 text-[#E4572E] focus:ring-[#E4572E] border-gray-300 rounded"
+                checked={formData.rememberMe}
+                onChange={(e) => setFormData((prev) => ({ ...prev, rememberMe: e.target.checked }))}
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                 Remember me

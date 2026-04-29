@@ -1,13 +1,14 @@
 const { logger } = require('./loggingService');
 const { Pool } = require('pg');
-const config = require('../config/config');
-const { URL } = require('url');
 
 // Threshold for slow queries in milliseconds
 const SLOW_QUERY_THRESHOLD = 200;
 const logAllQueries = process.env.LOG_ALL_QUERIES === 'true';
 
-// Create an instrumented pool
+/**
+ * InstrumentedPool extends the standard pg Pool to add query monitoring,
+ * logging, and performance tracking.
+ */
 class InstrumentedPool extends Pool {
   constructor(options) {
     super(options);
@@ -34,7 +35,7 @@ class InstrumentedPool extends Pool {
     } finally {
       const duration = Date.now() - start;
       
-      // Extract query name from comments if available
+      // Extract query name from comments if available: /* GetUserProfile */
       const queryName = (text.match(/\/\*\s*([^*]+)\s*\*\//) || [])[1] || 'anonymous';
       
       // Avoid per-query log overhead unless explicitly enabled.
@@ -101,58 +102,11 @@ class InstrumentedPool extends Pool {
   }
 }
 
-// Create and export instrumented pool
-// Parse DATABASE_URL into components to ensure IPv4 is used
-const parseConnString = (connString) => {
-  if (!connString) return null;
-  try {
-    const parsed = new URL(connString);
-    if (!parsed.hostname) return null;
-
-    return {
-      user: decodeURIComponent(parsed.username || ''),
-      password: decodeURIComponent(parsed.password || ''),
-      host: parsed.hostname,
-      port: parseInt(parsed.port, 10) || 5432,
-      database: (parsed.pathname || '/').replace(/^\//, '') || 'postgres'
-    };
-  } catch (e) {
-    return null;
-  }
-};
-
-const dbConfig = config.database.url ? parseConnString(config.database.url) : null;
-
-const poolConfig = dbConfig
-  ? {
-      host: dbConfig.host,
-      port: dbConfig.port,
-      database: dbConfig.database,
-      user: dbConfig.user,
-      password: dbConfig.password,
-      ssl: { rejectUnauthorized: false },
-      family: 4,
-      max: config.database.maxConnections,
-      idleTimeoutMillis: config.database.idleTimeoutMillis,
-      connectionTimeoutMillis: config.database.connectionTimeoutMillis
-    }
-  : {
-      host: config.database.host,
-      port: config.database.port,
-      database: config.database.name,
-      user: config.database.user,
-      password: config.database.password,
-      ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
-      family: 4,
-      max: config.database.maxConnections,
-      idleTimeoutMillis: config.database.idleTimeoutMillis,
-      connectionTimeoutMillis: config.database.connectionTimeoutMillis
-    };
-
-const pool = new InstrumentedPool(poolConfig);
-
-// Migration for query performance logs table
-const createQueryLogsTable = async () => {
+/**
+ * Migration for query performance logs table
+ * @param {InstrumentedPool} pool 
+ */
+const createQueryLogsTable = async (pool) => {
   try {
     const createTableQuery = `
       CREATE TABLE IF NOT EXISTS query_performance_logs (
@@ -171,21 +125,30 @@ const createQueryLogsTable = async () => {
       CREATE INDEX IF NOT EXISTS idx_query_perf_created_at ON query_performance_logs(created_at);
     `;
     
-    await pool._originalQuery(createTableQuery);
+    // Use _originalQuery or query (InstrumentedPool handles it)
+    await (pool._originalQuery || pool.query).call(pool, createTableQuery);
     logger.info('Query performance logs table initialized');
   } catch (error) {
     logger.error('Error creating query logs table:', error);
   }
 };
 
-// Initialize the monitoring system
-const initQueryMonitoring = async () => {
-  await createQueryLogsTable();
+/**
+ * Initialize the monitoring system
+ * @param {InstrumentedPool} pool 
+ */
+const initQueryMonitoring = async (pool) => {
+  await createQueryLogsTable(pool);
   logger.info('Query monitoring system initialized');
 };
 
-// Get slow query report
-const getSlowQueryReport = async (threshold = SLOW_QUERY_THRESHOLD, limit = 100) => {
+/**
+ * Get slow query report
+ * @param {InstrumentedPool} pool 
+ * @param {number} threshold 
+ * @param {number} limit 
+ */
+const getSlowQueryReport = async (pool, threshold = SLOW_QUERY_THRESHOLD, limit = 100) => {
   try {
     const query = `
       SELECT 
@@ -202,7 +165,7 @@ const getSlowQueryReport = async (threshold = SLOW_QUERY_THRESHOLD, limit = 100)
       LIMIT $2
     `;
     
-    const result = await pool._originalQuery(query, [threshold, limit]);
+    const result = await (pool._originalQuery || pool.query).call(pool, query, [threshold, limit]);
     return result.rows;
   } catch (error) {
     logger.error('Error generating slow query report:', error);
@@ -211,7 +174,7 @@ const getSlowQueryReport = async (threshold = SLOW_QUERY_THRESHOLD, limit = 100)
 };
 
 module.exports = {
-  pool,
+  InstrumentedPool,
   initQueryMonitoring,
   getSlowQueryReport,
   SLOW_QUERY_THRESHOLD

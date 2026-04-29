@@ -2,6 +2,7 @@ const Achievement = require('../models/Achievement');
 const Points = require('../models/Points');
 const Reputation = require('../models/Reputation');
 const socketManager = require('../utils/socketManager');
+const db = require('../config/database');
 
 class GamificationService {
   // Award points for an action
