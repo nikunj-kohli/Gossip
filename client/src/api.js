@@ -31,12 +31,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error.response ? error.response.status : null;
+    const message = error.response?.data?.message || '';
+
+    if (status === 401 || (status === 403 && (message.includes('token') || message.includes('Auth failed')))) {
       // Token might be expired or invalid
+      console.warn('Authentication failed, clearing session:', message);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Redirect to login page
-      if (window.location.pathname !== '/login') {
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
         window.location.href = '/login';
       }
     }

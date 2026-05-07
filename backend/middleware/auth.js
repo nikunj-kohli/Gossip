@@ -23,7 +23,10 @@ const authenticateToken = async (req, res, next) => {
         next();
     } catch (error) {
         console.warn(`Auth failed: ${error.message}. Token prefix: ${token.substring(0, 10)}...`);
-        return res.status(403).json({ message: 'Invalid or expired token' });
+        return res.status(401).json({ 
+            message: 'Invalid or expired token',
+            error: 'UNAUTHORIZED'
+        });
     }
 };
 

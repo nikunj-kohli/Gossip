@@ -20,7 +20,7 @@ const config = {
     host: process.env.HOST || 'localhost',
     corsOrigins: process.env.CORS_ORIGINS 
       ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean) 
-      : ['http://localhost:3000']
+      : []
   },
   
   // URLs

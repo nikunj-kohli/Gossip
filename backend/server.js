@@ -94,7 +94,7 @@ const corsOptions = {
     }
 
     console.warn(`CORS blocked for origin: ${origin}`);
-    const err = new Error('Origin is not allowed by CORS policy');
+    const err = new Error(`CORS policy: Origin ${origin} not allowed`);
     err.statusCode = 403;
     return callback(err);
   },
