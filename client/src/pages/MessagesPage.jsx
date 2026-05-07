@@ -168,11 +168,28 @@ const MessagesPage = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+    // Robust socket URL derivation
+    let socketUrl = import.meta.env.VITE_SOCKET_URL;
+    if (!socketUrl) {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      if (apiUrl.startsWith('http')) {
+        try {
+          const url = new URL(apiUrl);
+          socketUrl = url.origin;
+        } catch (e) {
+          socketUrl = window.location.origin;
+        }
+      } else {
+        socketUrl = window.location.origin;
+      }
+    }
+
     const socket = io(socketUrl, {
       auth: { token },
       transports: ['polling', 'websocket'],
       withCredentials: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     socketRef.current = socket;

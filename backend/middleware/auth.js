@@ -15,12 +15,14 @@ const authenticateToken = async (req, res, next) => {
         const user = await User.findById(decoded.userId);
         
         if (!user) {
+            console.warn(`Auth failed: User ${decoded.userId} not found in database`);
             return res.status(401).json({ message: 'User not found' });
         }
 
         req.user = user;
         next();
     } catch (error) {
+        console.warn(`Auth failed: ${error.message}. Token prefix: ${token.substring(0, 10)}...`);
         return res.status(403).json({ message: 'Invalid or expired token' });
     }
 };

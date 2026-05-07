@@ -71,52 +71,17 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const config = require('./config/config');
 
-const normalizeOrigin = (value) => {
-  try {
-    const parsed = new URL(value);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch (error) {
-    return value;
-  }
-};
+const allowedOrigins = Array.isArray(config.server.corsOrigins) 
+  ? config.server.corsOrigins 
+  : [];
 
-const originMatchesRule = (origin, rule) => {
-  if (!origin || !rule) return false;
-
-  const normalizedOrigin = normalizeOrigin(origin);
-  const normalizedRule = normalizeOrigin(rule);
-
-  if (normalizedOrigin === normalizedRule) {
-    return true;
-  }
-
-  // Wildcard subdomain support: https://*.example.pages.dev
-  const wildcardMatch = normalizedRule.match(/^(https?:\/\/)\*\.(.+)$/i);
-  if (!wildcardMatch) {
-    return false;
-  }
-
-  const [, protocol, baseHost] = wildcardMatch;
-
-  try {
-    const parsedOrigin = new URL(normalizedOrigin);
-    if (`${parsedOrigin.protocol}//` !== protocol) {
-      return false;
-    }
-
-    return parsedOrigin.hostname === baseHost || parsedOrigin.hostname.endsWith(`.${baseHost}`);
-  } catch (error) {
-    return false;
-  }
-};
+const { normalizeOrigin, originMatchesRule } = require('./utils/origin');
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) {
       return callback(null, true);
     }
@@ -128,13 +93,23 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    console.warn(`CORS blocked for origin: ${origin}`);
     const err = new Error('Origin is not allowed by CORS policy');
     err.statusCode = 403;
     return callback(err);
   },
   credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-CSRF-Token', 
+    'X-Requested-With', 
+    'Accept', 
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
 };
 
 const io = socketManager.initialize(server);

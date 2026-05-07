@@ -1,20 +1,21 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const config = require('../config/config');
 
 // Generate JWT token
 const generateToken = (payload, options = {}) => {
     const signOptions = {};
 
     if (!options.noExpiry) {
-        signOptions.expiresIn = options.expiresIn || process.env.JWT_EXPIRES_IN || '7d';
+        signOptions.expiresIn = options.expiresIn || config.auth.jwtExpiresIn || '7d';
     }
 
-    return jwt.sign(payload, process.env.JWT_SECRET, signOptions);
+    return jwt.sign(payload, config.auth.jwtSecret, signOptions);
 };
 
 // Verify JWT token
 const verifyToken = (token) => {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    return jwt.verify(token, config.auth.jwtSecret);
 };
 
 // Authentication middleware

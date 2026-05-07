@@ -2,50 +2,11 @@ const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 
-const configuredOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = Array.isArray(config.server.corsOrigins) 
+  ? config.server.corsOrigins 
+  : [];
 
-const allowedOrigins = configuredOrigins;
-
-const normalizeOrigin = (value) => {
-  try {
-    const parsed = new URL(value);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch (error) {
-    return value;
-  }
-};
-
-const originMatchesRule = (origin, rule) => {
-  if (!origin || !rule) return false;
-
-  const normalizedOrigin = normalizeOrigin(origin);
-  const normalizedRule = normalizeOrigin(rule);
-
-  if (normalizedOrigin === normalizedRule) {
-    return true;
-  }
-
-  const wildcardMatch = normalizedRule.match(/^(https?:\/\/)\*\.(.+)$/i);
-  if (!wildcardMatch) {
-    return false;
-  }
-
-  const [, protocol, baseHost] = wildcardMatch;
-
-  try {
-    const parsedOrigin = new URL(normalizedOrigin);
-    if (`${parsedOrigin.protocol}//` !== protocol) {
-      return false;
-    }
-
-    return parsedOrigin.hostname === baseHost || parsedOrigin.hostname.endsWith(`.${baseHost}`);
-  } catch (error) {
-    return false;
-  }
-};
+const { normalizeOrigin, originMatchesRule } = require('./origin');
 
 // Maps to store user data and connections
 const userSocketMap = new Map(); // userId -> Set of socketIds
@@ -84,7 +45,7 @@ function initialize(server) {
     }
     
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || config.auth.jwtSecret);
+      const decoded = jwt.verify(token, config.auth.jwtSecret);
       socket.user = decoded;
       next();
     } catch (error) {
