@@ -2,7 +2,7 @@ const { logger } = require('./loggingService');
 const { Pool } = require('pg');
 
 // Threshold for slow queries in milliseconds
-const SLOW_QUERY_THRESHOLD = 200;
+const SLOW_QUERY_THRESHOLD = 500;
 const logAllQueries = process.env.LOG_ALL_QUERIES === 'true';
 
 /**
@@ -139,6 +139,18 @@ const createQueryLogsTable = async (pool) => {
  */
 const initQueryMonitoring = async (pool) => {
   await createQueryLogsTable(pool);
+  
+  // Cleanup old logs on startup (older than 7 days)
+  try {
+    const cleanupQuery = `
+      DELETE FROM query_performance_logs WHERE created_at < NOW() - INTERVAL '7 days';
+    `;
+    await (pool._originalQuery || pool.query).call(pool, cleanupQuery);
+    logger.info('Old query performance logs pruned');
+  } catch (err) {
+    logger.error('Failed to prune old query logs:', err);
+  }
+
   logger.info('Query monitoring system initialized');
 };
 

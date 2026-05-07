@@ -1,4 +1,6 @@
 const db = require('../config/database');
+const cache = require('../services/enhancedRedisService');
+const { logger } = require('../services/loggingService');
 const crypto = require('crypto');
 
 class Post {
@@ -1009,7 +1011,18 @@ class Post {
         }
     }
 
-    static async getSuggestedCommunityPosts(userId, limit = 20, offset = 0) {
+    static async getSuggestedCommunityPosts(userId, limit = 10, offset = 0) {
+        // Try to get from cache first
+        const cacheKey = `suggested_posts:${userId}:${limit}:${offset}`;
+        try {
+            const cachedPosts = await cache.get(cacheKey);
+            if (cachedPosts) {
+                return cachedPosts;
+            }
+        } catch (cacheError) {
+            logger.warn('Error reading suggested posts from cache:', cacheError);
+        }
+
         try {
             const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 20, 100));
             const safeOffset = Math.max(0, parseInt(offset, 10) || 0);

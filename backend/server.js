@@ -38,6 +38,22 @@ const initializeServices = async () => {
     // Initialize query monitoring
     await initQueryMonitoring(db.pool);
     
+    // Prune activity logs from database (older than 7 days)
+    const pruneActivityLogs = async (days = 7) => {
+      try {
+        const db = require('./config/database');
+        // Fix: Using correct PostgreSQL interval syntax for parameters
+        const query = 'DELETE FROM user_activity_logs WHERE created_at < NOW() - ($1 * INTERVAL \'1 day\')';
+        await db.query(query, [days]);
+      } catch (error) {
+        // Silently ignore if table doesn't exist yet
+        if (error.code !== '42P01') {
+          console.error('Database error in pruneActivityLogs:', error);
+        }
+      }
+    };
+    await pruneActivityLogs(7);
+    
     // Initialize other services as needed
     console.log('All services initialized successfully');
   } catch (error) {

@@ -187,10 +187,22 @@ const storeActivityInDb = async (userId, action, entityType, entityId, details) 
   }
 };
 
+// Prune activity logs from database
+const pruneActivityLogs = async (days) => {
+  try {
+    const db = require('../config/database');
+    const query = 'DELETE FROM user_activity_logs WHERE created_at < NOW() - INTERVAL \'$1 days\'';
+    await db.query(query, [days]);
+  } catch (error) {
+    logger.error('Database error in pruneActivityLogs:', error);
+  }
+};
+
 module.exports = {
   logger,
   requestLogger,
   activityLogger,
   logRequest,
-  logActivity
+  logActivity,
+  pruneActivityLogs
 };

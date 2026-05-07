@@ -64,7 +64,7 @@ const createPost = async (req, res) => {
 
             // Award points for creating a post (if gamification is available)
             try {
-                await GamificationService.awardPoints(req.user.id, 'post_created', 5);
+                await GamificationService.awardPoints(req.user.id, 'post_create', 5);
             } catch (gamificationError) {
                 console.warn('Gamification service unavailable:', gamificationError.message);
             }
