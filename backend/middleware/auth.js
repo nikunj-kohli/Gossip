@@ -12,10 +12,11 @@ const authenticateToken = async (req, res, next) => {
 
     try {
         const decoded = verifyToken(token);
-        const user = await User.findById(decoded.userId);
+        const userId = decoded.userId || decoded.id;
+        const user = await User.findById(userId);
         
         if (!user) {
-            console.warn(`Auth failed: User ${decoded.userId} not found in database`);
+            console.warn(`Auth failed: User ${userId} not found in database`);
             return res.status(401).json({ message: 'User not found' });
         }
 
@@ -42,7 +43,8 @@ const optionalAuth = async (req, res, next) => {
   
   try {
     const decoded = verifyToken(token);
-    const user = await User.findById(decoded.userId);
+    const userId = decoded.userId || decoded.id;
+    const user = await User.findById(userId);
     
     if (user) {
       req.user = user;

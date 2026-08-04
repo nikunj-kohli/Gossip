@@ -16,6 +16,7 @@ const normalizeOrigin = (value) => {
  */
 const originMatchesRule = (origin, rule) => {
   if (!origin || !rule) return false;
+  if (rule === '*' || rule === 'all') return true;
 
   const normalizedOrigin = normalizeOrigin(origin);
   const normalizedRule = normalizeOrigin(rule);

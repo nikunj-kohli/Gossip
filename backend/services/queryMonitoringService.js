@@ -33,43 +33,48 @@ class InstrumentedPool extends Pool {
       error = err;
       throw err;
     } finally {
-      const duration = Date.now() - start;
-      
-      // Extract query name from comments if available: /* GetUserProfile */
-      const queryName = (text.match(/\/\*\s*([^*]+)\s*\*\//) || [])[1] || 'anonymous';
-      
-      // Avoid per-query log overhead unless explicitly enabled.
-      if (logAllQueries) {
-        logger.debug('Database query executed', {
-          query: queryName,
-          duration,
-          rows: result ? result.rowCount : 0
-        });
-      }
-      
-      // Log slow queries as warnings
-      if (duration > SLOW_QUERY_THRESHOLD) {
-        logger.warn('Slow query detected', {
-          query: queryName,
-          duration,
-          threshold: SLOW_QUERY_THRESHOLD,
-          sql: text.substring(0, 200), // Truncate long queries
-          rows: result ? result.rowCount : 0
-        });
+      try {
+        const duration = Date.now() - start;
+        const queryStr = typeof text === 'string' ? text : (text && typeof text.text === 'string' ? text.text : '');
         
-        // Store slow query in database for analysis
-        this._storeSlowQuery(queryName, text, params, duration, error)
-          .catch(err => logger.error('Error storing slow query:', err));
-      }
-      
-      // If an error occurred, log it
-      if (error) {
-        logger.error('Query error', {
-          query: queryName,
-          duration,
-          error: error.message,
-          code: error.code
-        });
+        // Extract query name from comments if available: /* GetUserProfile */
+        const queryName = (queryStr.match(/\/\*\s*([^*]+)\s*\*\//) || [])[1] || 'anonymous';
+        
+        // Avoid per-query log overhead unless explicitly enabled.
+        if (logAllQueries) {
+          logger.debug('Database query executed', {
+            query: queryName,
+            duration,
+            rows: result ? result.rowCount : 0
+          });
+        }
+        
+        // Log slow queries as warnings
+        if (duration > SLOW_QUERY_THRESHOLD) {
+          logger.warn('Slow query detected', {
+            query: queryName,
+            duration,
+            threshold: SLOW_QUERY_THRESHOLD,
+            sql: queryStr.substring(0, 200), // Truncate long queries
+            rows: result ? result.rowCount : 0
+          });
+          
+          // Store slow query in database for analysis
+          this._storeSlowQuery(queryName, queryStr, params, duration, error)
+            .catch(err => logger.error('Error storing slow query:', err));
+        }
+        
+        // If an error occurred, log it
+        if (error) {
+          logger.error('Query error', {
+            query: queryName,
+            duration,
+            error: error.message,
+            code: error.code
+          });
+        }
+      } catch (loggingError) {
+        logger.error('Error in query monitoring finally block:', loggingError);
       }
     }
   }

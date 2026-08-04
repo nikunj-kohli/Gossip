@@ -43,7 +43,7 @@ const initializeServices = async () => {
       try {
         const db = require('./config/database');
         // Fix: Using correct PostgreSQL interval syntax for parameters
-        const query = 'DELETE FROM user_activity_logs WHERE created_at < NOW() - ($1 * INTERVAL \'1 day\')';
+        const query = 'DELETE FROM user_activity_logs WHERE created_at < NOW() - (INTERVAL \'1 day\' * $1)';
         await db.query(query, [days]);
       } catch (error) {
         // Silently ignore if table doesn't exist yet
