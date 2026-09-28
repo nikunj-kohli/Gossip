@@ -2,7 +2,6 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
-const GamificationService = require('../services/gamificationService');
 
 // Create new post (optionally in a community/group)
 const createPost = async (req, res) => {
@@ -60,13 +59,6 @@ const createPost = async (req, res) => {
                     postType,
                     visibility
                 });
-            }
-
-            // Award points for creating a post (if gamification is available)
-            try {
-                await GamificationService.awardPoints(req.user.id, 'post_create', 5);
-            } catch (gamificationError) {
-                console.warn('Gamification service unavailable:', gamificationError.message);
             }
 
             return res.status(201).json(post);
