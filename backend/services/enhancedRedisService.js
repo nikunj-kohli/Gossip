@@ -17,6 +17,9 @@ const createRedisClient = () => {
     host: config.redis.host,
     port: config.redis.port,
     password: config.redis.password,
+    // Managed Redis providers (Upstash, Redis Cloud, Render secure Redis)
+    // usually require TLS: set REDIS_TLS=true to enable it.
+    tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
     retryStrategy: (times) => {
       // Exponential backoff with max 30 seconds
       const delay = Math.min(times * 500, 30000);
@@ -121,6 +124,11 @@ const get = async (key) => {
 
 // Delete a value with circuit breaker
 const del = async (key) => {
+  if (!isCachingEnabled || !redisClient) {
+    // No-op when caching is disabled or Redis is unavailable
+    return true;
+  }
+
   return executeWithBreaker(
     'redis-del',
     async () => {
