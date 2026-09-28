@@ -31,7 +31,14 @@ setInterval(cleanupExpired, 60 * 1000).unref();
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+// Cryptographically secure OTP generation (Math.random() is predictable and
+// would let an attacker narrow the 6-digit space dramatically).
+const generateOtp = () => {
+  const min = 100000;
+  const max = 1000000; // exclusive upper bound
+  const otp = crypto.randomInt(min, max);
+  return String(otp);
+};
 
 const canResendOtp = (email) => {
   const normalizedEmail = normalizeEmail(email);

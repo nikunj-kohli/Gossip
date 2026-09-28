@@ -18,8 +18,10 @@ describe('Authentication Edge Cases', () => {
 
   // Clean up after tests
   afterAll(async () => {
-    // Don't delete test user in case other tests need it
-    await db.end();
+    // Close the database pool (the pool object exposes .end in pg v8)
+    if (db.pool && typeof db.pool.end === 'function') {
+      await db.pool.end();
+    }
   });
 
   // Test edge cases

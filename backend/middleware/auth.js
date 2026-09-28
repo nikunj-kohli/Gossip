@@ -20,6 +20,19 @@ const authenticateToken = async (req, res, next) => {
             return res.status(401).json({ message: 'User not found' });
         }
 
+        // Block deactivated or actively suspended accounts even with a valid
+        // token (moderation must be able to cut access before token expiry).
+        if (user.is_active === false) {
+            return res.status(403).json({ message: 'Account is deactivated' });
+        }
+        if (user.moderation_status === 'suspended' || user.moderation_status === 'banned') {
+            const until = user.suspension_end_date ? new Date(user.suspension_end_date) : null;
+            const stillSuspended = !until || until > new Date();
+            if (stillSuspended) {
+                return res.status(403).json({ message: 'Account is suspended' });
+            }
+        }
+
         req.user = user;
         next();
     } catch (error) {

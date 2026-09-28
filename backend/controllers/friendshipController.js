@@ -1,6 +1,7 @@
 const Friendship = require('../models/Friendship');
 const User = require('../models/User');
 const redis = require('../services/enhancedRedisService');
+const notificationService = require('../services/notificationService');
 
 const requestsCacheKey = {
     connections: (userId) => `requests:connections:user:${userId}`,
@@ -108,6 +109,9 @@ const sendFriendRequest = async (req, res) => {
             redis.del(requestsCacheKey.status(userId, requesterId))
         ]);
 
+        // Notify the recipient (fire-and-forget)
+        notificationService.notifyFriendRequest(targetUser, req.user);
+
         return res.status(201).json({
             message: 'Message request sent',
             request: result.friendship
@@ -133,6 +137,12 @@ const acceptFriendRequest = async (req, res) => {
             redis.del(requestsCacheKey.status(addresseeId, userId)),
             redis.del(requestsCacheKey.status(userId, addresseeId))
         ]);
+
+        // Notify the original requester (fire-and-forget)
+        const requester = await User.findById(userId);
+        if (requester) {
+            notificationService.notifyFriendAccepted(requester, req.user);
+        }
 
         return res.json({
             message: 'Message request accepted',

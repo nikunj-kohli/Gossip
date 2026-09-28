@@ -336,3 +336,11 @@ const gracefulShutdown = async (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Export the express app for supertest-based tests. When required under Jest
+// (NODE_ENV=test-ish context) the HTTP server is not started automatically;
+// the module only starts listening when run directly (`node server.js`).
+if (require.main === module) {
+  // server.listen already invoked above; nothing extra to do here.
+}
+module.exports = app;

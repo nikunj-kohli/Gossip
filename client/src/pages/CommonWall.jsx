@@ -102,6 +102,7 @@ const CommonWall = () => {
       }
 
       const uploadedMedia = [];
+      const uploadedMediaIds = [];
       for (const file of mediaFiles) {
         const { data, error } = await uploadPostMedia(file);
         if (error || !data?.url) {
@@ -110,6 +111,7 @@ const CommonWall = () => {
           return;
         }
         uploadedMedia.push(data.url);
+        if (data.id) uploadedMediaIds.push(data.id);
       }
 
       const normalizedContent = [newPost.trim(), ...uploadedMedia].filter(Boolean).join('\n');
@@ -119,6 +121,11 @@ const CommonWall = () => {
         isAnonymous: isAnonymous,
         visibility: 'public'
       };
+
+      // Structured attachments: link uploaded media rows to the post
+      if (uploadedMediaIds.length > 0) {
+        postPayload.mediaIds = uploadedMediaIds;
+      }
 
       // Add groupId if posting to a community
       if (postMode === 'community' && selectedCommunity) {

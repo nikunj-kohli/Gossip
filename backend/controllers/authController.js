@@ -150,7 +150,13 @@ const sendForgotPasswordOtp = async (req, res) => {
 
         const user = await User.findByEmail(email);
         if (!user) {
-            return res.status(404).json({ message: 'No account found with this email' });
+            // Anti-enumeration: do not reveal whether the account exists.
+            // Return the same generic response as the success path, and skip
+            // creating/sending any OTP.
+            return res.json({
+                message: 'If an account exists for this email, an OTP has been sent.',
+                expiresInSeconds: 600,
+            });
         }
 
         const resendState = canResendOtp(email);

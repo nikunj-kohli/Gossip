@@ -63,6 +63,52 @@ class Media {
     }
   }
 
+  /**
+   * Validate a batch of media IDs: returns only rows that exist (not deleted)
+   * AND belong to the given user. Used before linking media to posts.
+   */
+  static async findByIdsOwnedBy(ids, userId) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    const clean = ids.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    if (clean.length === 0) return [];
+    try {
+      const placeholders = clean.map((_, i) => `$${i + 2}`).join(', ');
+      const query = `
+        SELECT id, user_id FROM media
+        WHERE id IN (${placeholders}) AND user_id = $1 AND is_deleted = false
+      `;
+      const result = await db.query(query, [userId, ...clean]);
+      return result.rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Link an array of owned media IDs to a post in one statement.
+   * Position follows the array order.
+   */
+  static async linkManyToPost(postId, mediaIds) {
+    if (!Array.isArray(mediaIds) || mediaIds.length === 0) return [];
+    try {
+      const values = [];
+      const tuples = mediaIds.map((mediaId, i) => {
+        values.push(postId, mediaId, i);
+        return `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`;
+      });
+      const query = `
+        INSERT INTO post_media (post_id, media_id, position)
+        VALUES ${tuples.join(', ')}
+        ON CONFLICT (post_id, media_id) DO UPDATE SET position = EXCLUDED.position
+        RETURNING *
+      `;
+      const result = await db.query(query, values);
+      return result.rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get all media for a user
   static async findByUser(userId, limit = 20, offset = 0) {
     try {

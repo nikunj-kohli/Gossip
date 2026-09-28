@@ -675,6 +675,7 @@ export const uploadInboxAttachment = async (file, userId) => {
 
     return {
       data: {
+        id: media.id ?? null,
         url: resolvedUrl,
         path: media.public_id || media.publicId || resolvedUrl,
         name: file.name,

@@ -1,5 +1,6 @@
 const Like = require('../models/Like');
 const Post = require('../models/Post');
+const notificationService = require('../services/notificationService');
 
 // Toggle like on post (like if not liked, unlike if already liked)
 const toggleLike = async (req, res) => {
@@ -24,6 +25,10 @@ const toggleLike = async (req, res) => {
         } else {
             // Add like if not liked
             response = await Like.addLike(userId, id);
+
+            // Notify the post author (fire-and-forget, never fails the request)
+            notificationService.notifyLike(post, req.user);
+
             res.json({ message: 'Post liked successfully', liked: true });
         }
 

@@ -39,7 +39,8 @@ class User{
     static async findById(id){
         const query = `
           SELECT id, username, email, display_name, bio, avatar_url, status, 
-                 email_verified, last_login, created_at, updated_at, is_active
+                 email_verified, last_login, created_at, updated_at, is_active,
+                 role, moderation_status, warning_count, suspension_end_date
           FROM users 
           WHERE id = $1
         `;

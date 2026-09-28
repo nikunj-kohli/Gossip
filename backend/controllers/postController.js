@@ -2,6 +2,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const GroupMember = require('../models/GroupMember');
+const Media = require('../models/Media');
 
 // Create new post (optionally in a community/group)
 const createPost = async (req, res) => {
@@ -39,6 +40,17 @@ const createPost = async (req, res) => {
 
         // Try to create post in database
         try {
+            // Optional media attachments: client passes uploaded media IDs.
+            // Every ID must belong to a media row owned by the requester.
+            let mediaIds = Array.isArray(req.body.mediaIds) ? req.body.mediaIds : [];
+            mediaIds = [...new Set(mediaIds)].slice(0, 4); // dedupe, max 4 attachments
+            if (mediaIds.length > 0) {
+                const owned = await Media.findByIdsOwnedBy(mediaIds, req.user.id);
+                if (owned.length !== mediaIds.length) {
+                    return res.status(403).json({ message: 'One or more media items not found or not owned by you' });
+                }
+            }
+
             // Create post
             let post;
             if (groupId) {
@@ -48,7 +60,7 @@ const createPost = async (req, res) => {
                     groupId,
                     content: content.trim(),
                     isAnonymous,
-                    postType
+                    postType: mediaIds.length > 0 ? 'media' : postType
                 });
             } else {
                 // Create regular post
@@ -56,9 +68,15 @@ const createPost = async (req, res) => {
                     userId: req.user.id,
                     content: content.trim(),
                     isAnonymous,
-                    postType,
+                    postType: mediaIds.length > 0 ? 'media' : postType,
                     visibility
                 });
+            }
+
+            // Link validated media rows to the new post
+            if (mediaIds.length > 0 && post?.id) {
+                await Media.linkManyToPost(post.id, mediaIds);
+                post.media_ids = mediaIds;
             }
 
             return res.status(201).json(post);
@@ -380,6 +398,13 @@ const getPostById = async (req, res) => {
         const post = await Post.getWithVisibilityCheck(id, userId);
         if (!post) {
             return res.status(404).json({ message: 'Post not found or you don\'t have permission to view it' });
+        }
+
+        // Attach structured media (if any) for consumers that render attachments
+        try {
+            post.media = await Post.getMedia(post.id);
+        } catch (mediaError) {
+            console.warn('Could not load post media:', mediaError.message);
         }
 
         res.json({ post });

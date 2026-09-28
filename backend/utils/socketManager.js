@@ -87,20 +87,52 @@ function initialize(server) {
     broadcastUserStatus(userId, 'online');
     
     // Join conversations (can be called later as well)
+    // SECURITY: verify the user is actually a participant of each conversation
+    // before joining its room - otherwise any authenticated user could listen
+    // to other people's message events.
     socket.on('join:conversations', async (conversationIds) => {
-      if (Array.isArray(conversationIds)) {
-        conversationIds.forEach(id => {
-          socket.join(`conversation:${id}`);
+      if (!Array.isArray(conversationIds)) return;
+      const db = require('../config/database');
+      const valid = conversationIds
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (valid.length === 0) return;
+
+      try {
+        const placeholders = valid.map((_, i) => `$${i + 2}`).join(', ');
+        const result = await db.query(
+          `SELECT id FROM conversations WHERE (user1_id = $1 OR user2_id = $1) AND id IN (${placeholders})`,
+          [userId, ...valid]
+        );
+        result.rows.forEach((row) => {
+          socket.join(`conversation:${row.id}`);
         });
+      } catch (dbError) {
+        console.error('Socket join:conversations db error:', dbError.message);
       }
     });
     
     // Join groups (can be called later as well)
+    // SECURITY: verify membership before joining a group room.
     socket.on('join:groups', async (groupIds) => {
-      if (Array.isArray(groupIds)) {
-        groupIds.forEach(id => {
-          socket.join(`group:${id}`);
+      if (!Array.isArray(groupIds)) return;
+      const db = require('../config/database');
+      const valid = groupIds
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (valid.length === 0) return;
+
+      try {
+        const placeholders = valid.map((_, i) => `$${i + 2}`).join(', ');
+        const result = await db.query(
+          `SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1 AND gm.group_id IN (${placeholders}) AND gm.status = 'active'`,
+          [userId, ...valid]
+        );
+        result.rows.forEach((row) => {
+          socket.join(`group:${row.group_id}`);
         });
+      } catch (dbError) {
+        console.error('Socket join:groups db error:', dbError.message);
       }
     });
     
@@ -260,12 +292,22 @@ async function broadcastUserStatus(userId, status) {
       status
     });
     
-    // We'd normally fetch this user's friends from the database
-    // For now, we'll emit to all users
-    io.emit('connection:status', {
-      userId,
-      status
-    });
+    // PRIVACY: broadcast presence only to accepted friends, not to everyone.
+    // (Previously: io.emit() leaked every user's online/offline status to all
+    // connected clients, authenticated or not.)
+    try {
+      const db = require('../config/database');
+      const friendsResult = await db.query(
+        `SELECT CASE WHEN requester_id = $1 THEN addressee_id ELSE requester_id END AS friend_id
+         FROM friendships WHERE (requester_id = $1 OR addressee_id = $1) AND status = 'accepted'`,
+        [userId]
+      );
+      friendsResult.rows.forEach(({ friend_id }) => {
+        io.to(`user:${friend_id}`).emit('connection:status', { userId, status });
+      });
+    } catch (dbError) {
+      console.error('Error broadcasting presence to friends:', dbError.message);
+    }
     
     // In a real implementation, you would:
     // 1. Get the user's friends from the database

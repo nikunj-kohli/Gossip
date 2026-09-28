@@ -6,7 +6,12 @@ const config = require('../config/config');
 const generateToken = (payload, options = {}) => {
     const signOptions = {};
 
-    if (!options.noExpiry) {
+    if (options.noExpiry) {
+        // "Remember me": use a long but FINITE lifetime. Never issue
+        // non-expiring tokens - a leaked token would otherwise be valid
+        // forever with no way to expire it.
+        signOptions.expiresIn = options.expiresIn || config.auth.jwtRefreshExpiresIn || '30d';
+    } else {
         signOptions.expiresIn = options.expiresIn || config.auth.jwtExpiresIn || '7d';
     }
 

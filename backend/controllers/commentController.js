@@ -1,5 +1,6 @@
 const Comment = require('../models/Comment');
 const Post = require('../models/Post');
+const notificationService = require('../services/notificationService');
 
 // Add comment to post
 const addComment = async (req, res) => {
@@ -45,6 +46,16 @@ const addComment = async (req, res) => {
             anonymousFlag,
             parsedParentCommentId
         );
+
+        // Notify post author (and parent comment author on replies).
+        // Anonymous comments are still notified to keep reply threads working,
+        // but the message intentionally hides the actor's name.
+        if (!anonymousFlag) {
+            notificationService.notifyComment(post, req.user, comment, parsedParentCommentId ? await Comment.getById(parsedParentCommentId) : null);
+        } else {
+            const anonymousActor = { ...req.user, display_name: 'Someone', username: 'someone' };
+            notificationService.notifyComment(post, anonymousActor, comment, parsedParentCommentId ? await Comment.getById(parsedParentCommentId) : null);
+        }
 
         res.status(201).json({
             message: 'Comment added successfully',

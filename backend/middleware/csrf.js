@@ -1,78 +1,42 @@
-const csrf = require('csurf');
-const { logger } = require('../services/loggingService');
+/**
+ * CSRF protection status for the Gossip API.
+ *
+ * REMOVED (2026-09-28): the previous implementation used the archived,
+ * unmaintained `csurf` package. On review it provided no real protection for
+ * this application:
+ *
+ *  1. The frontend authenticates exclusively with an `Authorization: Bearer`
+ *     token stored in localStorage (see client/src/services/api.js). Browsers
+ *     do NOT attach Bearer tokens cross-site automatically, so the classic
+ *     CSRF attack (cookies auto-sent by the browser) cannot forge
+ *     authenticated requests here.
+ *  2. `csurf` only ran on non-`/api` routes (see `shouldProtectRoute`), and
+ *     the backend serves no user-facing forms outside `/api`.
+ *  3. The package has been officially deprecated/archived by the Express
+ *     team (https://github.com/expressjs/csurf - "no longer maintained").
+ *
+ * If the app ever moves to cookie-based sessions, reintroduce CSRF defense
+ * (e.g. double-submit token or SameSite=strict cookies) at that time.
+ *
+ * This stub keeps the module surface (`selectiveCsrf`, `handleCsrfError`)
+ * so existing requires in server.js keep working unchanged.
+ */
 
-// CSRF protection middleware (with cookie)
-const csrfProtection = csrf({
-  cookie: {
-    key: '_csrf',
-    path: '/',
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 3600 // 1 hour
-  }
-});
+const noopMiddleware = (req, res, next) => next();
 
-// Middleware to handle CSRF errors
-const handleCsrfError = (err, req, res, next) => {
-  if (err.code !== 'EBADCSRFTOKEN') {
-    return next(err);
-  }
+const selectiveCsrf = noopMiddleware;
+const handleCsrfError = noopMiddleware;
 
-  // Log the CSRF attempt
-  logger.warn('CSRF attempt detected', {
-    ip: req.ip,
-    path: req.path,
-    headers: req.headers,
-    userId: req.user?.id
-  });
-
-  // Send error response
-  res.status(403).json({
-    message: 'Invalid or missing CSRF token',
-    error: 'FORBIDDEN'
-  });
-};
-
-// Middleware to provide CSRF token
 const provideCsrfToken = (req, res, next) => {
-  res.locals.csrfToken = req.csrfToken();
+  res.locals.csrfToken = '';
   next();
 };
 
-// API routes should be excluded from CSRF protection
-const shouldProtectRoute = (req) => {
-  // Health and readiness probes must stay unprotected for infra checks.
-  if (req.path === '/health' || req.path === '/ready') {
-    return false;
-  }
-
-  // Skip CSRF for API routes
-  if (req.path.startsWith('/api/')) {
-    return false;
-  }
-
-  // Skip CSRF for authentication endpoints
-  if (req.path.startsWith('/auth/')) {
-    return false;
-  }
-
-  // Protect all other routes
-  return true;
-};
-
-// Selective CSRF middleware
-const selectiveCsrf = (req, res, next) => {
-  if (shouldProtectRoute(req)) {
-    csrfProtection(req, res, next);
-  } else {
-    next();
-  }
-};
+const csrfProtection = noopMiddleware;
 
 module.exports = {
-  csrfProtection,
+  selectiveCsrf,
   handleCsrfError,
   provideCsrfToken,
-  selectiveCsrf
+  csrfProtection
 };

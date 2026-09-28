@@ -1,4 +1,5 @@
 const Media = require('../models/Media');
+const Post = require('../models/Post');
 const { MediaUploader, localUpload } = require('../utils/mediaUploader');
 
 // Upload media
@@ -137,11 +138,15 @@ exports.attachMediaToPost = async (req, res) => {
       return res.status(403).json({ message: 'Media not found or you do not have permission to use it' });
     }
 
-    // Verify post ownership (this would be done in your Post model)
-    // const post = await Post.findById(postId);
-    // if (!post || post.user_id !== userId) {
-    //   return res.status(403).json({ message: 'Post not found or you do not have permission to modify it' });
-    // }
+    // Verify post ownership (was previously commented out - security hole:
+    // any authenticated user could attach arbitrary media to any post)
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    if (post.user_id !== userId) {
+      return res.status(403).json({ message: 'You do not have permission to modify this post' });
+    }
 
     // Associate media with post
     const association = await Media.associateWithPost(postId, mediaId, position || 0);
